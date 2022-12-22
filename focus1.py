@@ -31,9 +31,9 @@ def getForegroundWindowTitle() -> Optional[str]:
     else:
         return None
 
-
-for i in range(1, 100000000):
+def getActiveWindow():
     print()
+    name, active_window_name = None, None
 
     active_window_name = getForegroundWindowTitle()
     print(active_window_name)
@@ -49,8 +49,15 @@ for i in range(1, 100000000):
     for item in psutil.process_iter():
         # print(item.name())
         if pid == item.pid:
-            print(item.name())
-    sleep(1)
+            name = item.name()
+            print(name)
+    # sleep(1)
+
+    return name, active_window_name[0]
+
+if __name__ == "__main__" :
+    for i in range(1, 100000000):
+        getActiveWindow()
 
 
 
@@ -62,15 +69,15 @@ for i in range(1, 100000000):
 
 
 
-from PyQt5.QtWidgets import QWidget, QApplication, QMessageBox
-
-
-class MainWindow(QWidget):
-    def __init__(self):
-        super().__init__()
-
-        self.setStyleSheet("background: black")
-        self.setWindowOpacity(0.9)
+# from PyQt5.QtWidgets import QWidget, QApplication, QMessageBox
+#
+#
+# class MainWindow(QWidget):
+#     def __init__(self):
+#         super().__init__()
+#
+#         self.setStyleSheet("background: black")
+#         self.setWindowOpacity(0.9)
 
 
 # if __name__ == '__main__':
