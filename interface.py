@@ -1,4 +1,6 @@
 import wx
+import json
+import math
 from focus1 import getActiveWindow
 
 app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
@@ -6,78 +8,65 @@ app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a windo
 class MainWindow(wx.Frame):
     def __init__(self, parent, title):
         self.Button1Name = "but1"
-        self.apps = []
+        self.text = [None] * 30
+        try:
+            with open('data_file.json', 'r') as outfile:
+                self.apps = json.load(outfile)
+        except:
+            self.apps = {}
 
         # wx.Frame.__init__(self, parent, title=title, size=(900,700), style=wx.DEFAULT_FRAME_STYLE)
-        wx.Frame.__init__(self, parent, title=title, size=(900, 700),
-                          style=wx.MINIMIZE_BOX | wx.RESIZE_BORDER |
-                                wx.SYSTEM_MENU | wx.CAPTION | wx.CLOSE_BOX | wx.CLIP_CHILDREN |
-                                wx.BORDER_DOUBLE)
+        wx.Frame.__init__(self, parent, title=title, size=(1400, 700),
+                          style=wx.MINIMIZE_BOX | wx.RESIZE_BORDER | wx.CAPTION | wx.CLOSE_BOX | wx.CLIP_CHILDREN)
         # self.control = wx.TextCtrl(self, style=wx.TE_MULTILINE)
-        self.CreateStatusBar() # A Statusbar in the bottom of the window
 
-        # Setting up the menu.
-        filemenu= wx.Menu()
+        # self.CreateStatusBar() # A Statusbar in the bottom of the window
 
-        # wx.ID_ABOUT and wx.ID_EXIT are standard IDs provided by wxWidgets.
-        filemenu.Append(wx.ID_ABOUT, "&About"," Information about this program")
-        filemenu.AppendSeparator()
-        filemenu.Append(wx.ID_EXIT,"E&xit"," Terminate the program")
+        # # Setting up the menu.
+        # filemenu= wx.Menu()
+        #
+        # # wx.ID_ABOUT and wx.ID_EXIT are standard IDs provided by wxWidgets.
+        # filemenu.Append(wx.ID_ABOUT, "&About"," Information about this program")
+        # filemenu.AppendSeparator()
+        # filemenu.Append(wx.ID_EXIT,"E&xit"," Terminate the program")
+        #
+        # # # Creating the menubar.
+        # # menuBar = wx.MenuBar()
+        # # menuBar.Append(filemenu,"&File") # Adding the "filemenu" to the MenuBar
+        # # self.SetMenuBar(menuBar)  # Adding the MenuBar to the Frame content.
 
-        # Creating the menubar.
-        menuBar = wx.MenuBar()
-        menuBar.Append(filemenu,"&File") # Adding the "filemenu" to the MenuBar
-        self.SetMenuBar(menuBar)  # Adding the MenuBar to the Frame content.
-
-        panel = wx.Panel(self)
-        panel.SetBackgroundColour("#367bef")
+        tabs = wx.Notebook(self, id=wx.ID_ANY)
+        self.panel1 = wx.Panel(tabs)
+        self.panel1.SetBackgroundColour("#f1f7fe")
 
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
         font.SetPointSize(14)
-        panel.SetFont(font)
+        self.panel1.SetFont(font)
+        tabs.InsertPage(0, self.panel1, "Tracker", select=True)
+        self.panel2 = wx.Panel(tabs)
 
-        # vbox = wx.BoxSizer(wx.VERTICAL)
+        self.panel2.SetBackgroundColour("#367bef")
+        tabs.InsertPage(1, self.panel2, "Relax")
+
+        self.LineHeight = 30
+        # if len(self.apps)>0:
+        #     for key, value in self.apps.items():
+        #         st = self.text[value['line_number']] = \
+        #             wx.StaticText(self.panel1, pos=wx.Point(400, value['line_number'] * self.LineHeight), size=(400, 30),
+        #                           label=f"{key} {value['time']}s", style=wx.ST_ELLIPSIZE_END)
+        #         st.SetBackgroundColour((250,250,250,0.8))
         #
-        # st = wx.StaticText(panel, label="Heyyy")
-        # st2 = wx.StaticText(panel, label="Heyyy2")
-        #
-        # vbox.Add(st, flag=wx.ALL, border=10)
-        # vbox.Add(st2, flag=wx.ALL, border=50)
-        #
-        # panel.SetSizer(vbox)
+        # for i in range(len(self.apps), len(self.text)):
+        #     self.text[i] = \
+        #         wx.StaticText(self.panel1, pos=wx.Point(10, i * self.LineHeight),
+        #                       label=f"empty{i}")
 
-# """
-#         gr = wx.GridBagSizer(5, 5)
-#         text = wx.StaticText(panel, label="Email:")
-#         gr.Add(text, pos=(0, 0), flag=wx.TOP | wx.LEFT | wx.BOTTOM, border=5)
-#
-#         tc = wx.TextCtrl(panel)
-#         gr.Add(tc, pos=(1, 0), span=(1, 5), flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=5)
-#
-#         button1 = wx.Button(panel, label="Восстановить", size=(120, 28))
-#         button2 = wx.Button(panel, label="Отмена", size=(90, 28))
-#
-#         gr.Add(button1, pos=(3, 3))
-#         gr.Add(button2, pos=(3, 4), flag=wx.RIGHT | wx.BOTTOM, border=10)
-#
-#         gr.AddGrowableCol(1)
-#         # gr.AddGrowableRow(0)
-#
-#         panel.SetSizer(gr)
-# """
-        gr = wx.GridBagSizer(5, 16)
-        self.text = [None] * 15
-        for i in range(0, len(self.text)):
-            self.text[i] = wx.StaticText(panel, label="Empty"+str(i))
+      #   g = wx.Gauge(self.panel1, id=wx.ID_ANY, range=100, pos=wx.DefaultPosition,
+      # size=wx.DefaultSize, style=wx.GA_HORIZONTAL, validator=wx.DefaultValidator,
+      # name=wx.GaugeNameStr)
+      #   g.SetValue(50)
+        # self.btn1 = wx.Button(panel, wx.ID_ANY, self.Button1Name)
 
-        for i in range(0, len(self.text)):
-            gr.Add(self.text[i], pos=(i, 1), flag=wx.EXPAND | wx.TOP | wx.LEFT | wx.RIGHT | wx.BOTTOM, border=0)
-
-        self.btn1 = wx.Button(panel, wx.ID_ANY, self.Button1Name)
-        gr.Add(self.btn1, pos=(16, 2), flag=wx.EXPAND | wx.TOP | wx.LEFT | wx.RIGHT | wx.BOTTOM, border=10)
-
-        # gr.AddGrowableCol(0)
-        panel.SetSizer(gr)
         # self.tx1 = wx.StaticText(self, id=15, label="Heyyy678")
         # self.tx2 = wx.StaticText(self, id=15, label="Heyyy67")
 
@@ -86,12 +75,14 @@ class MainWindow(wx.Frame):
 
 
         # self.Show(True)
-        # self.SetTransparent(245)
+        # self.SetTransparent(205)
+        # self.SetBackgroundColour("#367bef")
 
         # self.Bind(wx.EVT_MENU, self.onQuit, id=wx.ID_EXIT)
         # self.Bind(wx.EVT_COMMAND_LEFT_CLICK, self.LMBpressed)
         self.Bind(wx.EVT_LEFT_DOWN, self.LMBpressed)
         # self.Bind(wx.EVT_BUTTON, self.onButton1, id=self.btn1.GetId())
+
 
         self.timer = wx.Timer(self)
         self.timer.Start(1000)  # 25 changes per second.
@@ -99,14 +90,53 @@ class MainWindow(wx.Frame):
 
 
 
-        self.Bind(wx.EVT_PAINT, self.OnPaint)
 
-    def OnPaint(gr, e):
-        dc = wx.PaintDC(gr)
-        dc.SetPen(wx.Pen('#fdc073'))
 
-        dc.DrawLine(0, 0, 200, 100)
+        self.panel1.Bind(wx.EVT_PAINT, self.OnPaint)
 
+        self.list = wx.ListCtrl(self.panel2, wx.ID_ANY, style=wx.LC_REPORT, size=(600,200))
+        self.list.SetFont(wx.Font(wx.FontInfo(12)))
+        self.list.SetBackgroundColour("#f0f0f0")
+
+        self.list.InsertColumn(0, 'Название', width=100)
+        self.list.InsertColumn(1, 'Автор', width=100)
+        self.list.InsertColumn(2, 'Год издания', wx.LIST_FORMAT_RIGHT, 140)
+        self.list.InsertColumn(3, 'Цена', wx.LIST_FORMAT_RIGHT, 90)
+
+        books = [('Евгений Онегин', 'Пушкин А.С.', 2000, 192),
+                 ('Пиковая дама', 'Пушкин А.С.', 2004, 150.53),
+                 ('Мастер и Маргарита', 'Булгаков М.А.', 2005, 500),
+                 ('Роковые яйца', 'Булгаков М.А.', 2003, 400),
+                 ('Белая гвардия', 'Булгаков М.А.', 2010, 340)]
+
+        for b in books:
+            self.list.Append(b)
+
+
+
+
+
+
+
+    def OnResize(self, e):
+        self.Refresh()
+
+    def OnPaint(self, e):
+        dc = wx.PaintDC(self.panel1)
+        dc.SetPen(wx.Pen('#fdc073', style=wx.TRANSPARENT))
+
+        dc.DrawLine(0, 0, 500, 700)
+        dc.SetBrush(wx.Brush('#d5dde6', wx.SOLID))
+        max_time = max([x["time"] for x in self.apps.values()])
+        print(max_time)
+        for key, value in self.apps.items():
+            width = value["time"]
+            if width > 0:
+                # dc.DrawRectangle(800, self.LineHeight * value["line_number"], width * 500 // max_time, self.LineHeight)
+                dc.DrawRectangle(0, self.LineHeight * value["line_number"], int(math.log(width, 1.01)), self.LineHeight)
+                dc.DrawText(f"{key} {value['time']} s", 20, self.LineHeight * value["line_number"])
+        print("????")
+        # dc.DrawText("JJJJJJJJJJJJJJJJDFgdfg222222222222", 300, 100)
 
 
 
@@ -127,14 +157,48 @@ class MainWindow(wx.Frame):
 
     def Func1(self, event):
         # print("Func called")
-        appName, windowName = getActiveWindow()
-        if windowName not in [x["window_name"] for x in self.apps]:
-            self.apps.append({"app_name": appName, "window_name": windowName, "time": 0})
-            self.text[len(self.apps)-1].SetLabel(f"{appName} {windowName}")
+        # appName, windowName = getActiveWindow()
+        app = getActiveWindow()
+        if app:
+            fullAppName = ' '.join(app)
+
+            if fullAppName not in self.apps:
+                self.apps[fullAppName] = {"time": 0, "line_number": len(self.apps)}
+                print(self.apps)
+                # self.text[len(self.apps)-1].SetLabel(f"{fullAppName}")
+            else:
+                self.apps[fullAppName]["time"] += 1
+                # self.text[self.apps[fullAppName]["line_number"]].SetLabel(f"{fullAppName} {self.apps[fullAppName]['time']}s")
+
+                with open('data_file.json', 'w') as outfile:
+                    json.dump(self.apps, outfile, indent=4)
         else:
-            i = [x["window_name"] for x in self.apps].index(windowName)
-            self.apps[i]["time"] += 1
-            self.text[i].SetLabel(f"{appName} {windowName} {self.apps[i]['time']}s")
+            print(app)
+
+        self.Refresh()
+
+        # if windowName not in [x["window_name"] for x in self.apps]:
+        #     self.apps.append({"app_name": appName, "window_name": windowName, "time": 0})
+        #     self.text[len(self.apps) - 1].SetLabel(f"{appName} {windowName}")
+        # else:
+        #     i = [x["window_name"] for x in self.apps].index(windowName)
+        #     self.apps[i]["time"] += 1
+        #     self.text[i].SetLabel(f"{appName} {windowName} {self.apps[i]['time']}s")
+
+
+
+
+
+
+        # self.OnPaint(event)
+        # self.panel.Bind(wx.EVT_PAINT, self.OnPaint)
+
+
+
+        # dc = wx.PaintDC(self.panel)
+        # dc.SetPen(wx.Pen('#fdc073'))
+        #
+        # dc.DrawLine(0, 0, 200, 300)
 
 
 

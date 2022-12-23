@@ -4,6 +4,9 @@ import psutil
 import ctypes
 from ctypes import wintypes
 
+
+
+
 # for i in range(1, 100000000):
 #     pid = wintypes.DWORD()
 #     active = ctypes.windll.user32.GetForegroundWindow()
@@ -32,13 +35,15 @@ def getForegroundWindowTitle() -> Optional[str]:
         return None
 
 def getActiveWindow():
-    print()
-    name, active_window_name = None, None
+    # print()
+    name, active_window_name = '', ''
 
     active_window_name = getForegroundWindowTitle()
-    print(active_window_name)
-    active_window_name = active_window_name.replace('–', '-').replace('|', '-').split(' - ')[::-1]
-    print(active_window_name)
+    # print(active_window_name)
+    if active_window_name:
+        active_window_name = active_window_name.replace('–', '-').replace('|', '-').split(' - ')[::-1]
+
+    # print(active_window_name)
 
     pid = wintypes.DWORD()
     active = ctypes.windll.user32.GetForegroundWindow()
@@ -50,12 +55,27 @@ def getActiveWindow():
         # print(item.name())
         if pid == item.pid:
             name = item.name()
-            print(name)
+            # print(name)
     # sleep(1)
-
-    return name, active_window_name[0]
+    if name and active_window_name:
+        res = [name] + active_window_name
+    else:
+        res = None
+    print(res)
+    return res
 
 if __name__ == "__main__" :
+    import win32gui
+
+    w = win32gui
+    a = w.GetWindowText(w.GetForegroundWindow())
+    print(a)
+
+    import pyautogui
+
+    window_title = pyautogui.getActiveWindowTitle()
+    print(window_title)
+
     for i in range(1, 100000000):
         getActiveWindow()
 
