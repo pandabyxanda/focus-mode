@@ -54,13 +54,42 @@ def getActiveWindow():
     for item in psutil.process_iter():
         # print(item.name())
         if pid == item.pid:
-            name = item.name()
+            name = [item.name()]
             # print(name)
     # sleep(1)
-    if name and active_window_name:
-        res = [name] + active_window_name
-    else:
+    res = []
+    if name:
+        res += name
+    if active_window_name:
+        res += active_window_name
+    if len(res) == 0:
         res = None
+
+    # make names more convenient to understand
+
+    if len(res) >= 2:
+        if res[0] == 'chrome.exe':
+            res.pop(0)
+            if len(res) > 2:
+                res = res[0:2]
+            # if res[1] == 'YouTube':
+            #     res = res[0:2]
+        elif res[0] == 'explorer.exe':
+            res = res[0:1]
+            # res.pop(0)
+            # if res[0] == 'Program Manager':
+            #     res = ["Desktop"]
+            # else:
+            #     res = ["Folders"]
+        else:
+            if len(res) > 2:
+                res = res[0:2]
+
+        if len(res) > 1 and res[1].lower().replace(" ", "") in res[0].lower():
+            res.pop(0)
+
+
+
     print(res)
     return res
 

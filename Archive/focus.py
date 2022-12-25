@@ -8,7 +8,7 @@ app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a windo
 class MainWindow(wx.Frame):
     def __init__(self, parent, title):
         self.Button1Name = "but1"
-        self.text = [None] * 30
+        # self.text = [None] * 30
         try:
             with open('data_file.json', 'r') as outfile:
                 self.apps = json.load(outfile)
@@ -16,7 +16,7 @@ class MainWindow(wx.Frame):
             self.apps = {}
 
         # wx.Frame.__init__(self, parent, title=title, size=(900,700), style=wx.DEFAULT_FRAME_STYLE)
-        wx.Frame.__init__(self, parent, title=title, size=(1400, 700),
+        wx.Frame.__init__(self, parent, title=title, size=(800, 500),
                           style=wx.MINIMIZE_BOX | wx.RESIZE_BORDER | wx.CAPTION | wx.CLOSE_BOX | wx.CLIP_CHILDREN)
         # self.control = wx.TextCtrl(self, style=wx.TE_MULTILINE)
 
@@ -128,14 +128,26 @@ class MainWindow(wx.Frame):
         dc.DrawLine(0, 0, 500, 700)
         dc.SetBrush(wx.Brush('#d5dde6', wx.SOLID))
         max_time = max([x["time"] for x in self.apps.values()])
-        print(max_time)
+        # print(max_time)
+        i = 0
+        self.apps = {k: v for k, v in sorted(self.apps.items(), key=lambda item: item[1]['time'], reverse=True)}
         for key, value in self.apps.items():
             width = value["time"]
+            if i >= 10:
+                break
             if width > 0:
                 # dc.DrawRectangle(800, self.LineHeight * value["line_number"], width * 500 // max_time, self.LineHeight)
-                dc.DrawRectangle(0, self.LineHeight * value["line_number"], int(math.log(width, 1.01)), self.LineHeight)
-                dc.DrawText(f"{key} {value['time']} s", 20, self.LineHeight * value["line_number"])
-        print("????")
+                dc.DrawRectangle(0, self.LineHeight * i, int(math.log(width, 1.01)), self.LineHeight)
+                dc.DrawText(f"{key} {value['time']} s", 20, self.LineHeight * i)
+            i += 1
+
+
+                # dc.DrawRectangle(0, self.LineHeight * value["line_number"], int(math.log(width, 1.01)), self.LineHeight)
+                # dc.DrawText(f"{key} {value['time']} s", 20, self.LineHeight * value["line_number"])
+
+
+
+        # print("????")
         # dc.DrawText("JJJJJJJJJJJJJJJJDFgdfg222222222222", 300, 100)
 
 
