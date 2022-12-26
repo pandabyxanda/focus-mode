@@ -1,14 +1,97 @@
 import wx
+import wx.adv
 import json  # for saving information
 import math
 import sqlite3
 import datetime
+import time
 from focus1 import get_active_window
+import screen_brightness_control
 
-app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
+
+
+TRAY_TOOLTIP = 'Name'
+TRAY_ICON = 'star.png'
+TRAY_ICON2 = 'star (2).png'
 
 
 # TODO: using this tool
+
+def create_menu_item(menu, label, func):
+    item = wx.MenuItem(menu, -1, label)
+    menu.Bind(wx.EVT_MENU, func, id=item.GetId())
+    menu.Append(item)
+    return item
+
+
+class TaskBarIcon(wx.adv.TaskBarIcon):
+    def __init__(self, frame):
+        self.frame = frame
+        frame.task_bar_icon = self
+        super(TaskBarIcon, self).__init__()
+        self.set_icon(TRAY_ICON)
+        self.Bind(wx.adv.EVT_TASKBAR_LEFT_DOWN, self.on_left_down)
+
+    def CreatePopupMenu(self):
+        menu = wx.Menu()
+        create_menu_item(menu, 'Site', self.on_hello)
+        menu.AppendSeparator()
+        create_menu_item(menu, 'Exit', self.on_exit)
+        return menu
+
+    def set_icon(self, path):
+        icon = wx.Icon(path)
+        self.SetIcon(icon, TRAY_TOOLTIP)
+
+    def on_left_down(self, event):
+        print('Tray icon was left-clicked.')
+        print(f"{self.frame.IsIconized() = }")
+        if self.frame.IsIconized():
+            self.set_icon(TRAY_ICON)
+            self.frame.Show()
+            self.frame.Iconize(iconize=False)
+
+        else:
+            self.frame.Hide()
+            self.frame.Iconize(iconize=True)
+            self.set_icon(TRAY_ICON2)
+        # self.frame.RequestUserAttention(flags=wx.USER_ATTENTION_INFO)
+
+    def on_hello(self, event):
+        print('Hello, world!')
+
+    def on_exit(self, event):
+
+        print('Closing from the tray')
+        wx.CallAfter(self.Destroy)
+        self.frame.Destroy()
+
+class DarkWindow(wx.Frame):
+    def __init__(self, parent, title):
+        screen_size = wx.GetDisplaySize()
+        print(screen_size)
+        wx.Frame.__init__(self, parent, title=title, size=(400, 400), pos=(0,0),
+                          style = wx.DEFAULT_FRAME_STYLE & ~wx.CAPTION | wx.FRAME_FLOAT_ON_PARENT)
+        # wx.Frame.__init__(self, parent, title=title, size=screen_size, pos=(0,0),
+        #                   style=wx.MINIMIZE_BOX | wx.RESIZE_BORDER | wx.CAPTION
+        #                         | wx.CLOSE_BOX | wx.CLIP_CHILDREN | wx.FRAME_FLOAT_ON_PARENT)
+        self.panel5 = wx.Panel(self, id=wx.ID_ANY, pos=wx.DefaultPosition, size=screen_size,
+            style=wx.TAB_TRAVERSAL, name=wx.PanelNameStr)
+        self.panel5.SetBackgroundColour("#1f2525")
+
+        self.Centre()
+        self.Show()
+        bStop = wx.Button(self.panel5, id=90, label="Stop it")
+        self.panel5.Bind(wx.EVT_BUTTON, self.on_button_stop, id=90)
+        self.Maximize()
+        # self.MAXIMIZE_BOX()
+        # self.STAY_ON_TOP()
+
+    def on_button_stop(self, event):
+        # print(__name__)
+        self.Close()
+        # self.Refresh()
+        wx.Event.Skip(event)
 
 class MainWindow(wx.Frame):
     def __init__(self, parent, title):
@@ -16,6 +99,8 @@ class MainWindow(wx.Frame):
         self.LastActiveWindow = None
         self.TimeAppOpened = datetime.datetime.now()
         self.all_rows = self.get_rows_from_database()
+        # screen_size = wx.GetDisplaySize()
+        # print(f"{screen_size = }")
 
         # self.text = [None] * 30
         try:
@@ -27,6 +112,7 @@ class MainWindow(wx.Frame):
         wx.Frame.__init__(self, parent, title=title, size=(800, 700),
                           style=wx.MINIMIZE_BOX | wx.RESIZE_BORDER | wx.CAPTION | wx.CLOSE_BOX | wx.CLIP_CHILDREN)
 
+        self.SetIcon(wx.Icon('favicon.ico', wx.BITMAP_TYPE_ICO))
         # self.CreateStatusBar() # A Statusbar in the bottom of the window
 
         tabs = wx.Notebook(self, id=wx.ID_ANY)
@@ -38,6 +124,8 @@ class MainWindow(wx.Frame):
         self.panel1.SetFont(font)
         tabs.InsertPage(0, self.panel1, "Tracker", select=True)
         self.panel2 = wx.Panel(tabs)
+
+        self.panel2.SetFont(font)
 
         self.panel2.SetBackgroundColour("#367bef")
         tabs.InsertPage(1, self.panel2, "Relax")
@@ -52,36 +140,60 @@ class MainWindow(wx.Frame):
         self.panel1.Bind(wx.EVT_LEFT_DOWN, self.lmb_pressed)
         # self.Bind(wx.EVT_BUTTON, self.onButton1, id=self.btn1.GetId())
 
-        self.timer1 = wx.Timer(self, id=50)
-        self.timer1.Start(1000)  # 25 changes per second.
-        self.timer2 = wx.Timer(self, id=60)
-        self.timer2.Start(3000)  # 25 changes per second.
+
 
         self.Bind(wx.EVT_TIMER, self.func1, id=50)
-        self.Bind(wx.EVT_TIMER, self.func2, id=60)
+        self.Bind(wx.EVT_TIMER, self.relax_darken, id=60)
         self.Bind(wx.EVT_MOVING, self.on_move)
         self.Bind(wx.EVT_SIZE, self.on_resize)
+        # self.Bind(wx.EVT_CLOSE, self.on_exit)
+
+        self.Bind(wx.EVT_CLOSE, self.on_minimize)
 
         self.panel1.Bind(wx.EVT_PAINT, self.on_paint)
         self.panel1.Bind(wx.EVT_SET_FOCUS, self.on_focus)
 
-        self.list = wx.ListCtrl(self.panel2, wx.ID_ANY, style=wx.LC_REPORT, size=(600, 200))
-        self.list.SetFont(wx.Font(wx.FontInfo(12)))
-        self.list.SetBackgroundColour("#f0f0f0")
+        st1 = wx.StaticText(
+            self.panel2, id=wx.ID_ANY, label="Seconds", pos=wx.DefaultPosition,
+            size=wx.DefaultSize, style=0, name=wx.StaticTextNameStr
+        )
 
-        self.list.InsertColumn(0, 'Название', width=100)
-        self.list.InsertColumn(1, 'Автор', width=100)
-        self.list.InsertColumn(2, 'Год издания', wx.LIST_FORMAT_RIGHT, 140)
-        self.list.InsertColumn(3, 'Цена', wx.LIST_FORMAT_RIGHT, 90)
+        # tc1 = wx.TextCtrl(
+        #     self.panel2, id=wx.ID_ANY, value="ggg", pos=(100, 0),
+        #     size=wx.DefaultSize, style=0, validator=wx.DefaultValidator,
+        #     name=wx.TextCtrlNameStr
+        # )
 
-        books = [('Евгений Онегин', 'Пушкин А.С.', 2000, 192),
-                 ('Пиковая дама', 'Пушкин А.С.', 2004, 150.53),
-                 ('Мастер и Маргарита', 'Булгаков М.А.', 2005, 500),
-                 ('Роковые яйца', 'Булгаков М.А.', 2003, 400),
-                 ('Белая гвардия', 'Булгаков М.А.', 2010, 340)]
+        self.spin_ctrl1 = wx.SpinCtrl(self.panel2, id=wx.ID_ANY, value="10", pos=(200, 0),
+                    size=wx.DefaultSize, style=wx.SP_ARROW_KEYS, min=0, max=100, initial=0,
+                    name="wxSpinCtrl")
 
-        for b in books:
-            self.list.Append(b)
+
+        print(self.spin_ctrl1.GetValue())
+
+        self.timer1 = wx.Timer(self, id=50)
+        self.timer1.Start(1000)  # 25 changes per second.
+
+        self.timer2 = wx.Timer(self, id=60)
+        self.timer2.Start(self.spin_ctrl1.GetValue() * 1000)  # 25 changes per second.
+
+        # self.list = wx.ListCtrl(self.panel2, wx.ID_ANY, style=wx.LC_REPORT, size=(600, 200))
+        # self.list.SetFont(wx.Font(wx.FontInfo(12)))
+        # self.list.SetBackgroundColour("#f0f0f0")
+        #
+        # self.list.InsertColumn(0, 'Название', width=100)
+        # self.list.InsertColumn(1, 'Автор', width=100)
+        # self.list.InsertColumn(2, 'Год издания', wx.LIST_FORMAT_RIGHT, 140)
+        # self.list.InsertColumn(3, 'Цена', wx.LIST_FORMAT_RIGHT, 90)
+        #
+        # books = [('Евгений Онегин', 'Пушкин А.С.', 2000, 192),
+        #          ('Пиковая дама', 'Пушкин А.С.', 2004, 150.53),
+        #          ('Мастер и Маргарита', 'Булгаков М.А.', 2005, 500),
+        #          ('Роковые яйца', 'Булгаков М.А.', 2003, 400),
+        #          ('Белая гвардия', 'Булгаков М.А.', 2010, 340)]
+        #
+        # for b in books:
+        #     self.list.Append(b)
 
     def on_resize(self, event):
         print("OnResize")
@@ -99,8 +211,21 @@ class MainWindow(wx.Frame):
         self.Refresh()
         wx.Event.Skip(event)
 
+
+    # def on_exit(self, event):
+    #     print("closing window")
+    #     wx.CallAfter(self.Destroy)
+    #     self.Close()
+
+    def on_minimize(self, event):
+        print("minimizing window")
+        self.Iconize()
+        # wx.CallAfter(self.Destroy)
+        # self.Close()
+
     def on_paint(self, event):
         print("onPaint")
+        # self.task_bar_icon.set_icon(TRAY_ICON2)
 
         self.get_rows_from_database()
 
@@ -141,7 +266,12 @@ class MainWindow(wx.Frame):
 
     def lmb_pressed(self, event):
         print("LMB pressed")
-        self.Refresh()
+        # self.Refresh()
+        frame = DarkWindow(self, "Focus mode33")
+        # frame.Centre()
+        # frame.Show(True)
+
+
         wx.Event.Skip(event)
 
         # wx.StaticText(self, id=14, label="Heydddddyy678")
@@ -153,10 +283,20 @@ class MainWindow(wx.Frame):
         # self.btn1.SetLabel("1245")
         # self.btn1
 
-    def func2(self, event):
+    def relax_darken(self, event):
+        print("darken")
         # print(event.GetId(), "func2")
         # self.getrowsfromdatabase()
         pass
+
+        # get current brightness value
+        # prev = screen_brightness_control.get_brightness()
+        # print(prev)
+        # screen_brightness_control.set_brightness(1)
+        # print(screen_brightness_control.get_brightness())
+        # time.sleep(4)
+        # screen_brightness_control.set_brightness(prev[0])
+        # print(screen_brightness_control.get_brightness())
 
     @staticmethod
     def get_rows_from_database():
@@ -203,22 +343,41 @@ class MainWindow(wx.Frame):
                 # with open('data_file.json', 'w') as outfile:
                 #     json.dump(self.apps, outfile, indent=4)
         else:
-            print(app)
+            print(active_window)
 
         # self.Refresh()
 
 
+class App(wx.App):
+    def OnInit(self):
+        frame = MainWindow(None, "Focus mode")
+        frame.Centre()
+        frame.Show(True)
+        self.SetTopWindow(frame)
+        TaskBarIcon(frame)
+        return True
+
+
+def main():
+    # app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
+
+    # frame = wx.Frame(None, wx.ID_ANY, "Hello World", size=(700, 500)) # A Frame is a top-level window.
+    # frame = MainWindow(None, "Focus mode")  # A Frame is a top-level window.
+    # frame.Centre()
+    # frame.Show(True)  # Show the frame.
+    # frame.Close()
+    app = App(False)
+    app.MainLoop()
+    database_cursor.close()
+
+    print('sss')
+    # with open('data_file.json', 'w') as outfile:
+    #     json.dump(frame.apps, outfile, indent=4)
+
+
 database_connection = sqlite3.connect("database.db")
 database_cursor = database_connection.cursor()
+if __name__ == '__main__':
+    main()
 
-# frame = wx.Frame(None, wx.ID_ANY, "Hello World", size=(700, 500)) # A Frame is a top-level window.
-frame = MainWindow(None, "Focus mode")  # A Frame is a top-level window.
-frame.Centre()
-frame.Show(True)  # Show the frame.
-# frame.Close()
-app.MainLoop()
 database_cursor.close()
-
-print('sss')
-# with open('data_file.json', 'w') as outfile:
-#     json.dump(frame.apps, outfile, indent=4)
