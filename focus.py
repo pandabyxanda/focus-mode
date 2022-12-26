@@ -1,11 +1,12 @@
 import wx
-import json # for saving information
+import json  # for saving information
 import math
 import sqlite3
 import datetime
-from focus1 import getActiveWindow
+from focus1 import get_active_window
 
 app = wx.App(False)  # Create a new app, don't redirect stdout/stderr to a window.
+
 
 # TODO: using this tool
 
@@ -14,14 +15,16 @@ class MainWindow(wx.Frame):
         self.Button1Name = "but1"
         self.LastActiveWindow = None
         self.TimeAppOpened = datetime.datetime.now()
+        self.all_rows = self.get_rows_from_database()
+
         # self.text = [None] * 30
         try:
             with open('data_file.json', 'r') as outfile:
                 self.apps = json.load(outfile)
-        except:
+        except Exception:
             self.apps = {}
 
-        wx.Frame.__init__(self, parent, title=title, size=(800, 500),
+        wx.Frame.__init__(self, parent, title=title, size=(800, 700),
                           style=wx.MINIMIZE_BOX | wx.RESIZE_BORDER | wx.CAPTION | wx.CLOSE_BOX | wx.CLIP_CHILDREN)
 
         # self.CreateStatusBar() # A Statusbar in the bottom of the window
@@ -46,14 +49,21 @@ class MainWindow(wx.Frame):
 
         # self.Bind(wx.EVT_MENU, self.onQuit, id=wx.ID_EXIT)
         # self.Bind(wx.EVT_COMMAND_LEFT_CLICK, self.LMBpressed)
-        self.Bind(wx.EVT_LEFT_DOWN, self.LMBpressed)
+        self.panel1.Bind(wx.EVT_LEFT_DOWN, self.lmb_pressed)
         # self.Bind(wx.EVT_BUTTON, self.onButton1, id=self.btn1.GetId())
 
-        self.timer = wx.Timer(self)
-        self.timer.Start(1000)  # 25 changes per second.
-        self.Bind(wx.EVT_TIMER, self.Func1)
+        self.timer1 = wx.Timer(self, id=50)
+        self.timer1.Start(1000)  # 25 changes per second.
+        self.timer2 = wx.Timer(self, id=60)
+        self.timer2.Start(3000)  # 25 changes per second.
 
-        self.panel1.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.Bind(wx.EVT_TIMER, self.func1, id=50)
+        self.Bind(wx.EVT_TIMER, self.func2, id=60)
+        self.Bind(wx.EVT_MOVING, self.on_move)
+        self.Bind(wx.EVT_SIZE, self.on_resize)
+
+        self.panel1.Bind(wx.EVT_PAINT, self.on_paint)
+        self.panel1.Bind(wx.EVT_SET_FOCUS, self.on_focus)
 
         self.list = wx.ListCtrl(self.panel2, wx.ID_ANY, style=wx.LC_REPORT, size=(600, 200))
         self.list.SetFont(wx.Font(wx.FontInfo(12)))
@@ -73,30 +83,47 @@ class MainWindow(wx.Frame):
         for b in books:
             self.list.Append(b)
 
-    def OnResize(self, e):
+    def on_resize(self, event):
+        print("OnResize")
         self.Refresh()
+        wx.Event.Skip(event)
 
-    def OnPaint(self, e):
+    def on_focus(self, event):
+        print("OnFocus")
+        self.save_to_db()
+        self.Refresh()
+        wx.Event.Skip(event)
+
+    def on_move(self, event):
+        print("OnMove")
+        self.Refresh()
+        wx.Event.Skip(event)
+
+    def on_paint(self, event):
+        print("onPaint")
+
+        self.get_rows_from_database()
+
         dc = wx.PaintDC(self.panel1)
         dc.SetPen(wx.Pen('#fdc073', style=wx.TRANSPARENT))
 
         dc.DrawLine(0, 0, 500, 700)
         dc.SetBrush(wx.Brush('#d5dde6', wx.SOLID))
-        max_time = max([x["time"] for x in self.apps.values()])
+        # max_time = max([x["time"] for x in self.apps.values()])
         # print(max_time)
-        i = 0
-        self.apps = {k: v for k, v in sorted(self.apps.items(), key=lambda item: item[1]['time'], reverse=True)}
 
-        for key, value in self.apps.items():
-            width = value["time"]
-            if i >= 10:
+        # [print(x) for x in self.all_rows]
+        # self.apps = {k: v for k, v in sorted(self.apps.items(), key=lambda item: item[1]['time'], reverse=True)}
+        for i, row in enumerate(self.all_rows):
+            data = row[0]
+            duration = row[1]
+            if i >= 20:
                 break
-            if width > 0:
-                # dc.DrawRectangle(0, self.LineHeight * i, int(math.log(width, 1.01)), self.LineHeight)
-                dc.DrawText(f"{key} {value['time']} s", 20, self.LineHeight * i)
-            i += 1
-
-
+            if len(data) > 40:
+                data = data[:40] + "..."
+            if duration > 0:
+                dc.DrawRectangle(0, self.LineHeight * i, int(math.log(duration, 1.01)), self.LineHeight)
+                dc.DrawText(f"{data} {int(duration)} s", 20, self.LineHeight * i)
 
         # for key, value in self.apps.items():
         #     width = value["time"]
@@ -107,49 +134,70 @@ class MainWindow(wx.Frame):
         #         dc.DrawText(f"{key} {value['time']} s", 20, self.LineHeight * i)
         #     i += 1
 
-    def onQuit(self, event):
+    def on_quit(self, event):
         print(event)
         print("ccccccccccccc")
         self.Close()
 
-    def LMBpressed(self, event):
+    def lmb_pressed(self, event):
         print("LMB pressed")
+        self.Refresh()
+        wx.Event.Skip(event)
+
         # wx.StaticText(self, id=14, label="Heydddddyy678")
         # self.tx1.SetLabel("ffffff")
         # print(event)
 
-    def onButton1(self, event):
+    def on_button1(self, event):
         print("pressed button...")
-        self.btn1.SetLabel("1245")
+        # self.btn1.SetLabel("1245")
         # self.btn1
 
-    def Func1(self, event):
+    def func2(self, event):
+        # print(event.GetId(), "func2")
+        # self.getrowsfromdatabase()
+        pass
+
+    @staticmethod
+    def get_rows_from_database():
+        database_cursor.execute("""select full_name, sum((julianday(time_end)-julianday(time_start))*24*60*60) 
+        from data 
+        group by full_name 
+        order by sum(julianday(time_end)-julianday(time_start)) desc""")
+        return database_cursor.fetchall()
+        # [print(x) for x in self.all_rows]
+
+    def func1(self, event):
+        # print(event.GetId())
         # print("Func called")
         # appName, windowName = getActiveWindow()
-        app = getActiveWindow()
-        if app:
-            fullAppName = ' '.join(app)
-            if fullAppName != self.LastActiveWindow:
+        self.save_to_db()
+
+    def save_to_db(self):
+        active_window = get_active_window()
+        if active_window:
+            full_app_name = ' '.join(active_window)
+            if full_app_name != self.LastActiveWindow:
                 if self.LastActiveWindow:
                     database_cursor.execute("select count(*) from data")
                     number_of_rows = database_cursor.fetchone()[0]
-                    print(f"{number_of_rows = }")
+                    # print(f"{number_of_rows = }")
                     database_cursor.execute("""
                         INSERT INTO data VALUES
                             (?, ?, ?, ?, NULL)
                     """,
-                                (number_of_rows + 1, self.LastActiveWindow, self.TimeAppOpened, datetime.datetime.now()))
+                                            (number_of_rows + 1, self.LastActiveWindow, self.TimeAppOpened,
+                                             datetime.datetime.now()))
                     database_connection.commit()
-                self.LastActiveWindow = fullAppName
+                self.LastActiveWindow = full_app_name
                 self.TimeAppOpened = datetime.datetime.now()
 
-
-            if fullAppName not in self.apps:
-                self.apps[fullAppName] = {"time": 0, "line_number": len(self.apps)}
-                print(self.apps)
+            if full_app_name not in self.apps:
+                self.apps[full_app_name] = {"time": 0, "line_number": len(self.apps)}
+                # print(self.apps)
                 # self.text[len(self.apps)-1].SetLabel(f"{fullAppName}")
             else:
-                self.apps[fullAppName]["time"] += 1
+                self.apps[full_app_name]["time"] += 1
                 # self.text[self.apps[fullAppName]["line_number"]].SetLabel(f"{fullAppName} {self.apps[fullAppName]['time']}s")
 
                 # with open('data_file.json', 'w') as outfile:
@@ -157,11 +205,7 @@ class MainWindow(wx.Frame):
         else:
             print(app)
 
-        self.Refresh()
-
-
-
-
+        # self.Refresh()
 
 
 database_connection = sqlite3.connect("database.db")
@@ -176,6 +220,5 @@ app.MainLoop()
 database_cursor.close()
 
 print('sss')
-with open('data_file.json', 'w') as outfile:
-    json.dump(frame.apps, outfile, indent=4)
-
+# with open('data_file.json', 'w') as outfile:
+#     json.dump(frame.apps, outfile, indent=4)

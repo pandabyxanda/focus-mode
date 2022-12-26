@@ -57,7 +57,7 @@ print("-==========")
 database_cursor.execute("""select full_name, sum((julianday(time_end)-julianday(time_start))*24*60*60) 
 from data 
 group by full_name 
-order by julianday(time_end)-julianday(time_start) desc""")
+order by sum(julianday(time_end)-julianday(time_start)) desc""")
 all_rows = database_cursor.fetchall()
 [print(x) for x in all_rows]
 

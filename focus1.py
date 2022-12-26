@@ -1,11 +1,8 @@
-from time import sleep
+# from time import sleep
 
 import psutil
-import ctypes
-from ctypes import wintypes
-
-
-
+# import ctypes
+# from ctypes import wintypes
 
 # for i in range(1, 100000000):
 #     pid = wintypes.DWORD()
@@ -23,22 +20,23 @@ from typing import Optional
 from ctypes import wintypes, windll, create_unicode_buffer
 
 
-def getForegroundWindowTitle() -> Optional[str]:
-    hWnd = windll.user32.GetForegroundWindow()
+def get_foreground_window_title() -> Optional[str]:
+    hwnd = windll.user32.GetForegroundWindow()
     # print(hWnd)
-    length = windll.user32.GetWindowTextLengthW(hWnd)
+    length = windll.user32.GetWindowTextLengthW(hwnd)
     buf = create_unicode_buffer(length + 1)
-    windll.user32.GetWindowTextW(hWnd, buf, length + 1)
+    windll.user32.GetWindowTextW(hwnd, buf, length + 1)
     if buf.value:
         return buf.value
     else:
         return None
 
-def getActiveWindow():
+
+def get_active_window():
     # print()
     name, active_window_name = '', ''
 
-    active_window_name = getForegroundWindowTitle()
+    active_window_name = get_foreground_window_title()
     # print(active_window_name)
     if active_window_name:
         active_window_name = active_window_name.replace('–', '-').replace('|', '-').split(' - ')[::-1]
@@ -46,9 +44,8 @@ def getActiveWindow():
     # print(active_window_name)
 
     pid = wintypes.DWORD()
-    active = ctypes.windll.user32.GetForegroundWindow()
-    active_window = ctypes.windll.user32.GetWindowThreadProcessId(active, ctypes.byref(pid))
-
+    # active = ctypes.windll.user32.GetForegroundWindow()
+    # active_window = ctypes.windll.user32.GetWindowThreadProcessId(active, ctypes.byref(pid))
 
     pid = pid.value
     for item in psutil.process_iter():
@@ -88,12 +85,11 @@ def getActiveWindow():
         if len(res) > 1 and res[1].lower().replace(" ", "") in res[0].lower():
             res.pop(0)
 
-
-
-    print(res)
+    # print(res)
     return res
 
-if __name__ == "__main__" :
+
+if __name__ == "__main__":
     import win32gui
 
     w = win32gui
@@ -106,17 +102,7 @@ if __name__ == "__main__" :
     print(window_title)
 
     for i in range(1, 100000000):
-        getActiveWindow()
-
-
-
-
-
-
-
-
-
-
+        get_active_window()
 
 # from PyQt5.QtWidgets import QWidget, QApplication, QMessageBox
 #
@@ -145,10 +131,6 @@ if __name__ == "__main__" :
 #     mw.close()
 #
 #     app.exec()
-
-
-
-
 
 
 # importing the module
