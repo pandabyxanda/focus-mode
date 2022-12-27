@@ -1,5 +1,6 @@
 import wx
 import wx.adv
+import wx.lib.scrolledpanel as scrolled
 import json  # for saving information
 import math
 import sqlite3
@@ -148,6 +149,9 @@ class MainWindow(wx.Frame):
         self.TimeAppOpened = datetime.datetime.now()
         self.all_rows = self.get_rows_from_database()
         self.new_line_added_to_db = False
+
+
+
         # screen_size = wx.GetDisplaySize()
         # print(f"{screen_size = }")
 
@@ -161,17 +165,43 @@ class MainWindow(wx.Frame):
         wx.Frame.__init__(self, parent, title=title, size=(800, 700),
                           style=wx.MINIMIZE_BOX | wx.RESIZE_BORDER | wx.CAPTION | wx.CLOSE_BOX | wx.CLIP_CHILDREN)
 
+
+
         self.SetIcon(wx.Icon('favicon.ico', wx.BITMAP_TYPE_ICO))
         # self.CreateStatusBar() # A Statusbar in the bottom of the window
+        # self.scroll = wx.ScrolledWindow(self)
+        # self.scroll.SetScrollbars(1, 1, 1600, 1400)
 
         tabs = wx.Notebook(self, id=wx.ID_ANY)
         self.panel1 = wx.Panel(tabs)
         self.panel1.SetBackgroundColour("#f1f7fe")
 
+        # self.panel1 = wx.ScrolledWindow(tabs)
+        # self.panel1.SetScrollbars(1, 1, 20, 20)
+
+
+
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
         font.SetPointSize(14)
         self.panel1.SetFont(font)
+
+
         tabs.InsertPage(0, self.panel1, "Tracker", select=False)
+
+        vbox_main = wx.BoxSizer(wx.VERTICAL)
+        self.panel1.SetSizer(vbox_main)
+        self.pn1_main = wx.Panel(self.panel1, size=(200, 100))
+        self.pn2_main = wx.Panel(self.panel1, size=(200, 100))
+        hbox_main = wx.BoxSizer(wx.HORIZONTAL)
+        vbox_main.Add(hbox_main, flag=wx.EXPAND | wx.ALIGN_LEFT, border=10, proportion=1)
+
+        hbox_main.Add(self.pn1_main, flag=wx.EXPAND, border=10, proportion=1)
+        hbox_main.Add(self.pn2_main, flag=wx.EXPAND, border=10)
+        self.pn1_main.SetBackgroundColour("#dfedfd")
+        self.pn2_main.SetBackgroundColour("#e7f2fe")
+
+
+
         self.panel2 = wx.Panel(tabs)
 
         self.panel2.SetFont(font)
@@ -197,7 +227,9 @@ class MainWindow(wx.Frame):
 
         self.Bind(wx.EVT_CLOSE, self.on_minimize)
 
-        self.panel1.Bind(wx.EVT_PAINT, self.on_paint)
+        self.pn1_main.Bind(wx.EVT_PAINT, self.on_paint1)
+        self.pn2_main.Bind(wx.EVT_PAINT, self.on_paint2)
+
         self.panel1.Bind(wx.EVT_SET_FOCUS, self.on_focus)
 
         vbox = wx.BoxSizer(wx.VERTICAL)
@@ -346,17 +378,20 @@ class MainWindow(wx.Frame):
     def on_minimize(self, event):
         print("minimizing window")
         self.Iconize()
+        self.Hide()
         # wx.CallAfter(self.Destroy)
         # self.Close()
 
-    def on_paint(self, event):
-        print("onPaint")
+    def on_paint1(self, event):
+        print("onPaint1")
+        # print(event)
         # self.task_bar_icon.set_icon(TRAY_ICON2)
         if self.new_line_added_to_db == True:
             self.all_rows = self.get_rows_from_database()
             self.new_line_added_to_db = False
 
-        dc = wx.PaintDC(self.panel1)
+        dc = wx.PaintDC(self.pn1_main)
+        # dc2 = wx.PaintDC(self.pn2_main)
         dc.SetPen(wx.Pen('#fdc073', style=wx.TRANSPARENT))
 
         dc.DrawLine(0, 0, 500, 700)
@@ -369,7 +404,7 @@ class MainWindow(wx.Frame):
         for i, row in enumerate(self.all_rows):
             data = row[0]
             duration = row[1]
-            if i >= 20:
+            if i >= 40:
                 break
             if len(data) > 40:
                 data = data[:40] + "..."
@@ -377,7 +412,7 @@ class MainWindow(wx.Frame):
                 # dc.DrawRectangle(0, self.LineHeight * i, int(math.log(duration, 50)), self.LineHeight)
                 dc.DrawRectangle(0, self.LineHeight * i, int(duration * 1000 / 21600), self.LineHeight)
                 dc.DrawText(f"{data}", 20, self.LineHeight * i)
-                dc.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 450, self.LineHeight * i)
+                # dc2.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 450, self.LineHeight * i)
 
         # for key, value in self.apps.items():
         #     width = value["time"]
@@ -387,6 +422,28 @@ class MainWindow(wx.Frame):
         #         dc.DrawRectangle(0, self.LineHeight * i, int(math.log(width, 1.01)), self.LineHeight)
         #         dc.DrawText(f"{key} {value['time']} s", 20, self.LineHeight * i)
         #     i += 1
+
+    def on_paint2(self, event):
+        print("onPaint2")
+        # print(event)
+        # self.task_bar_icon.set_icon(TRAY_ICON2)
+
+        dc2 = wx.PaintDC(self.pn2_main)
+        # dc2 = wx.PaintDC(self.pn2_main)
+        dc2.SetPen(wx.Pen('#fdc073', style=wx.TRANSPARENT))
+
+        dc2.DrawLine(0, 0, 500, 700)
+        dc2.SetBrush(wx.Brush('#d5dde6', wx.SOLID))
+        # max_time = max([x["time"] for x in self.apps.values()])
+        # print(max_time)
+
+        # [print(x) for x in self.all_rows]
+        # self.apps = {k: v for k, v in sorted(self.apps.items(), key=lambda item: item[1]['time'], reverse=True)}
+        for i, row in enumerate(self.all_rows):
+            duration = row[1]
+            if i >= 40:
+                break
+            dc2.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 10, self.LineHeight * i)
 
     def on_quit(self, event):
         print(event)

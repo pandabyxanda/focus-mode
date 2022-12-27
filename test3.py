@@ -1,35 +1,35 @@
+#!/usr/bin/env python3
 import wx
+import wx.lib.scrolledpanel as scrolled
 
 
-class MyFrame(wx.Frame):
-    def __init__(self, parent, title):
-        super().__init__(parent, title=title, size=(600, 450))
-
-        panel = wx.Panel(self)
-        vbox = wx.BoxSizer(wx.VERTICAL)
-        panel.SetSizer(vbox)
-        st = wx.StaticText(panel, label="Адрес: ")
-
-        vbox.Add(st, flag=wx.ALL | wx.ALIGN_RIGHT, border=10)
-
-        inp = wx.TextCtrl(panel, value="г. Москва")
-        vbox.Add(inp, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, border=10)
-
-        hbox = wx.BoxSizer(wx.HORIZONTAL)
+class MainWindow(wx.Frame):
+    def __init__(self, parent):
+        wx.Frame.__init__(self, parent, id=wx.ID_ANY, title=u"Title", pos=wx.DefaultPosition, size=wx.Size(800, 480),
+                          style=wx.DEFAULT_FRAME_STYLE | wx.TAB_TRAVERSAL)
+        self.SetSizeHints(wx.DefaultSize, wx.DefaultSize)
+        self.panel = wx.Panel(self)
+        notebook = wx.Notebook(self.panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0)
 
 
-        inp2 = wx.TextCtrl(panel, value="г. Москва")
-        hbox.Add(inp2, flag=wx.RIGHT | wx.BOTTOM, border=10)
-        inp3 = wx.TextCtrl(panel, value="г. Москва")
-        inp3.Centre()
-        hbox.Add(inp3, flag=wx.LEFT | wx.RIGHT | wx.BOTTOM, border=10)
+        scrolled_window = scrolled.ScrolledPanel(notebook, wx.ID_ANY)
+        scrolled_window.SetupScrolling()
+        notebook.AddPage(scrolled_window, "Tab %d", False)
+        bsizer = wx.GridSizer(0, 5, 0, 0)
+        for btn in range(0, 50):
+            button = wx.Button(scrolled_window, wx.ID_ANY, str(btn), wx.DefaultPosition, wx.DefaultSize, 0)
+            button.SetMinSize((-1, 90))
+            bsizer.Add(button, 0, wx.ALL | wx.EXPAND, 5)
+        scrolled_window.SetSizer(bsizer)
 
-        vbox.Add(hbox, flag=wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, border=10)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(notebook, 1, wx.ALL | wx.EXPAND, 5)
+        self.panel.SetSizer(sizer)
+        self.Layout()
+        self.Refresh()
 
 
-
-
-app = wx.App()
-frame = MyFrame(None, 'wxPython')
-frame.Show()
+app = wx.App(False)
+main_window = MainWindow(parent=None)
+main_window.Show(True)
 app.MainLoop()
