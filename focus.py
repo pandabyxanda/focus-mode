@@ -8,8 +8,6 @@ import time
 from focus1 import get_active_window
 import screen_brightness_control
 
-
-
 TRAY_TOOLTIP = 'Name'
 TRAY_ICON = 'star.png'
 TRAY_ICON2 = 'star (2).png'
@@ -66,32 +64,82 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         wx.CallAfter(self.Destroy)
         self.frame.Destroy()
 
+
 class DarkWindow(wx.Frame):
-    def __init__(self, parent, title):
+    def __init__(self, parent, title, duration):
         screen_size = wx.GetDisplaySize()
+        self.parent = parent
+
         print(screen_size)
-        wx.Frame.__init__(self, parent, title=title, size=(400, 400), pos=(0,0),
-                          style = wx.DEFAULT_FRAME_STYLE & ~wx.CAPTION | wx.FRAME_FLOAT_ON_PARENT)
+        wx.Frame.__init__(self, parent, title=title, size=(400, 400), pos=(0, 0),
+                          style=wx.DEFAULT_FRAME_STYLE & ~wx.CAPTION | wx.FRAME_FLOAT_ON_PARENT)
         # wx.Frame.__init__(self, parent, title=title, size=screen_size, pos=(0,0),
         #                   style=wx.MINIMIZE_BOX | wx.RESIZE_BORDER | wx.CAPTION
         #                         | wx.CLOSE_BOX | wx.CLIP_CHILDREN | wx.FRAME_FLOAT_ON_PARENT)
         self.panel5 = wx.Panel(self, id=wx.ID_ANY, pos=wx.DefaultPosition, size=screen_size,
-            style=wx.TAB_TRAVERSAL, name=wx.PanelNameStr)
+                               style=wx.TAB_TRAVERSAL, name=wx.PanelNameStr)
         self.panel5.SetBackgroundColour("#1f2525")
-
+        font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+        font.SetPointSize(14)
+        self.panel5.SetFont(font)
+        self.opacity = 50
+        self.SetTransparent(self.opacity)
         self.Centre()
         self.Show()
-        bStop = wx.Button(self.panel5, id=90, label="Stop it")
+
+        self.timer2 = wx.Timer(self, id=104)
+        self.timer2.Start(1000)
+
+        self.timer3 = wx.Timer(self, id=105)
+        self.timer3.Start(100)
+
+        self.Bind(wx.EVT_TIMER, self.count_down, id=104)
+        self.Bind(wx.EVT_TIMER, self.on_timer_change_opacity, id=105)
+
+        self.break_duration = duration
+        t = time.strftime('%M:%S', time.gmtime(duration))
+        self.button_label = t + " \n" + "Press to close"
+        self.button_stop = wx.Button(self.panel5, id=90, label=self.button_label, size=(300, 200))
+        self.button_stop.Centre()
         self.panel5.Bind(wx.EVT_BUTTON, self.on_button_stop, id=90)
         self.Maximize()
+
+        # self.timer1 = wx.Timer(self, id=103)
+        # self.timer1.Start(self.break_duration)  # 25 changes per second.
+        # self.Bind(wx.EVT_TIMER, self.end_of_relax_mode, id=103)
+
         # self.MAXIMIZE_BOX()
         # self.STAY_ON_TOP()
 
+    def on_timer_change_opacity(self, event):
+        if self.opacity <= 240:
+            self.opacity += 10
+            self.SetTransparent(self.opacity)
+        else:
+            self.timer3.Stop()
+
     def on_button_stop(self, event):
-        # print(__name__)
+        self.close_break_window(event)
+
+    def end_of_relax_mode(self, event):
+        self.close_break_window(event)
+
+    def close_break_window(self, event):
+        self.parent.time_before_break = self.parent.spin_ctrl1.GetValue()
         self.Close()
-        # self.Refresh()
+        self.timer2.Stop()
         wx.Event.Skip(event)
+
+    def count_down(self, event):
+        if self.break_duration > 1:
+            self.break_duration -= 1
+        else:
+            self.close_break_window(event)
+
+        t = time.strftime('%M:%S', time.gmtime(self.break_duration))
+        self.button_label = t + " \n" + "Press to close"
+        self.button_stop.Label = self.button_label
+
 
 class MainWindow(wx.Frame):
     def __init__(self, parent, title):
@@ -99,6 +147,7 @@ class MainWindow(wx.Frame):
         self.LastActiveWindow = None
         self.TimeAppOpened = datetime.datetime.now()
         self.all_rows = self.get_rows_from_database()
+        self.new_line_added_to_db = False
         # screen_size = wx.GetDisplaySize()
         # print(f"{screen_size = }")
 
@@ -122,13 +171,13 @@ class MainWindow(wx.Frame):
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
         font.SetPointSize(14)
         self.panel1.SetFont(font)
-        tabs.InsertPage(0, self.panel1, "Tracker", select=True)
+        tabs.InsertPage(0, self.panel1, "Tracker", select=False)
         self.panel2 = wx.Panel(tabs)
 
         self.panel2.SetFont(font)
 
-        self.panel2.SetBackgroundColour("#367bef")
-        tabs.InsertPage(1, self.panel2, "Relax")
+        self.panel2.SetBackgroundColour("#f1f7fe")
+        tabs.InsertPage(1, self.panel2, "Relax", select=True)
 
         self.LineHeight = 30
         # self.Show(True)
@@ -139,8 +188,6 @@ class MainWindow(wx.Frame):
         # self.Bind(wx.EVT_COMMAND_LEFT_CLICK, self.LMBpressed)
         self.panel1.Bind(wx.EVT_LEFT_DOWN, self.lmb_pressed)
         # self.Bind(wx.EVT_BUTTON, self.onButton1, id=self.btn1.GetId())
-
-
 
         self.Bind(wx.EVT_TIMER, self.func1, id=50)
         self.Bind(wx.EVT_TIMER, self.relax_darken, id=60)
@@ -153,8 +200,51 @@ class MainWindow(wx.Frame):
         self.panel1.Bind(wx.EVT_PAINT, self.on_paint)
         self.panel1.Bind(wx.EVT_SET_FOCUS, self.on_focus)
 
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        self.panel2.SetSizer(vbox)
+
+        # break_on_timer_mode = wx.ToggleButton(self.panel2, id=93, label='red', pos=(20, 25))
+
+        hbox1 = wx.BoxSizer(wx.HORIZONTAL)
+        pn = wx.Panel(self.panel2)
+        sb1 = wx.StaticBox(pn, label="Timer:", size=(150, 50))
+        self.rd1 = wx.RadioButton(pn, label="On", pos=(10, 20), style=wx.RB_GROUP, id=92)
+        rd2 = wx.RadioButton(pn, label="Off", pos=(100, 20), id=93)
+        rd2.SetValue(True)
+
+        hbox1.Add(pn, flag=wx.LEFT | wx.TOP, border=10)
+        # hbox.Add(rd1, flag=wx.LEFT | wx.TOP, border=10)
+        # hbox.Add(rd2, flag=wx.RIGHT | wx.TOP, border=10)
+        vbox.Add(hbox1, flag=wx.ALL | wx.ALIGN_CENTER, border=10)
+
+        hbox2 = wx.BoxSizer(wx.HORIZONTAL)
         st1 = wx.StaticText(
-            self.panel2, id=wx.ID_ANY, label="Seconds", pos=wx.DefaultPosition,
+            self.panel2, id=wx.ID_ANY, label="Work time, seconds", pos=(10, 0),
+            size=wx.DefaultSize, style=0, name=wx.StaticTextNameStr
+        )
+        self.spin_ctrl1 = wx.SpinCtrl(self.panel2, id=71, value="30", pos=(200, 0),
+                                      size=wx.DefaultSize, style=wx.SP_ARROW_KEYS, min=10, max=1000, initial=0,
+                                      name="wxSpinCtrl")
+        hbox2.Add(st1, flag=wx.LEFT | wx.TOP, border=10)
+        hbox2.Add(self.spin_ctrl1, flag=wx.LEFT | wx.TOP, border=10)
+        vbox.Add(hbox2, flag=wx.ALL | wx.ALIGN_CENTER, border=10)
+
+        hbox3 = wx.BoxSizer(wx.HORIZONTAL)
+        st2 = wx.StaticText(
+            self.panel2, id=wx.ID_ANY, label="Break time, seconds", pos=(10, 50),
+            size=wx.DefaultSize, style=0, name=wx.StaticTextNameStr
+        )
+        self.spin_ctrl2 = wx.SpinCtrl(self.panel2, id=wx.ID_ANY, value="10", pos=(200, 50),
+                                      size=wx.DefaultSize, style=wx.SP_ARROW_KEYS, min=0, max=100, initial=0,
+                                      name="wxSpinCtrl2")
+        hbox3.Add(st2, flag=wx.LEFT | wx.TOP, border=10)
+        hbox3.Add(self.spin_ctrl2, flag=wx.LEFT | wx.TOP, border=10)
+        vbox.Add(hbox3, flag=wx.ALL | wx.ALIGN_CENTER, border=10)
+
+        hbox4 = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.st3 = wx.StaticText(
+            self.panel2, id=wx.ID_ANY, label="Time till next break",
             size=wx.DefaultSize, style=0, name=wx.StaticTextNameStr
         )
 
@@ -164,18 +254,38 @@ class MainWindow(wx.Frame):
         #     name=wx.TextCtrlNameStr
         # )
 
-        self.spin_ctrl1 = wx.SpinCtrl(self.panel2, id=wx.ID_ANY, value="10", pos=(200, 0),
-                    size=wx.DefaultSize, style=wx.SP_ARROW_KEYS, min=0, max=100, initial=0,
-                    name="wxSpinCtrl")
+        self.time_before_break = self.spin_ctrl1.GetValue()
 
+        t = time.strftime('%M:%S', time.gmtime(self.time_before_break))
+        # print(f"{t = }")
+        self.st4 = wx.StaticText(
+            self.panel2, id=wx.ID_ANY, label=t,
+            size=wx.DefaultSize, style=0, name=wx.StaticTextNameStr
+        )
+        hbox4.Add(self.st3, flag=wx.LEFT | wx.TOP, border=10)
+        hbox4.Add(self.st4, flag=wx.LEFT | wx.TOP, border=10)
+        vbox.Add(hbox4, flag=wx.ALL | wx.ALIGN_CENTER, border=10)
 
-        print(self.spin_ctrl1.GetValue())
+        hbox5 = wx.BoxSizer(wx.HORIZONTAL)
+        self.button_start = wx.Button(self.panel2, id=91, label="Start break", pos=(200, 200), size=(200, 100))
+        hbox5.Add(self.button_start, flag=wx.LEFT | wx.TOP, border=10)
+        vbox.Add(hbox5, flag=wx.ALL | wx.ALIGN_CENTER, border=10)
+
+        self.panel2.Bind(wx.EVT_BUTTON, self.break_begin, id=91)
+
+        # print(self.spin_ctrl1.GetValue())
 
         self.timer1 = wx.Timer(self, id=50)
-        self.timer1.Start(1000)  # 25 changes per second.
+        self.timer1.Start(1000)
 
         self.timer2 = wx.Timer(self, id=60)
-        self.timer2.Start(self.spin_ctrl1.GetValue() * 1000)  # 25 changes per second.
+        self.timer2.Start(self.spin_ctrl1.GetValue() * 1000)
+
+        self.timer3 = wx.Timer(self, id=61)
+        self.timer3.Start(1000)
+
+        self.Bind(wx.EVT_TIMER, self.time_till_break, id=61)
+        self.Bind(wx.EVT_SPINCTRL, self.on_spinctrl1, id=71)
 
         # self.list = wx.ListCtrl(self.panel2, wx.ID_ANY, style=wx.LC_REPORT, size=(600, 200))
         # self.list.SetFont(wx.Font(wx.FontInfo(12)))
@@ -195,6 +305,23 @@ class MainWindow(wx.Frame):
         # for b in books:
         #     self.list.Append(b)
 
+    def on_spinctrl1(self, event):
+        self.time_before_break = self.spin_ctrl1.GetValue()
+        t = time.strftime('%M:%S', time.gmtime(self.time_before_break))
+        # print(f"{t = }")
+        self.st4.Label = str(t)
+
+    def time_till_break(self, event):
+        if self.rd1.GetValue() == True:
+            if self.time_before_break > 1:
+                self.time_before_break -= 1
+                t = time.strftime('%M:%S', time.gmtime(self.time_before_break))
+                # print(f"{t = }")
+                self.st4.Label = str(t)
+            elif self.time_before_break == 1:
+                self.time_before_break = -1
+                self.break_begin(event)
+
     def on_resize(self, event):
         print("OnResize")
         self.Refresh()
@@ -211,7 +338,6 @@ class MainWindow(wx.Frame):
         self.Refresh()
         wx.Event.Skip(event)
 
-
     # def on_exit(self, event):
     #     print("closing window")
     #     wx.CallAfter(self.Destroy)
@@ -226,8 +352,9 @@ class MainWindow(wx.Frame):
     def on_paint(self, event):
         print("onPaint")
         # self.task_bar_icon.set_icon(TRAY_ICON2)
-
-        self.get_rows_from_database()
+        if self.new_line_added_to_db == True:
+            self.all_rows = self.get_rows_from_database()
+            self.new_line_added_to_db = False
 
         dc = wx.PaintDC(self.panel1)
         dc.SetPen(wx.Pen('#fdc073', style=wx.TRANSPARENT))
@@ -247,8 +374,10 @@ class MainWindow(wx.Frame):
             if len(data) > 40:
                 data = data[:40] + "..."
             if duration > 0:
-                dc.DrawRectangle(0, self.LineHeight * i, int(math.log(duration, 1.01)), self.LineHeight)
-                dc.DrawText(f"{data} {int(duration)} s", 20, self.LineHeight * i)
+                # dc.DrawRectangle(0, self.LineHeight * i, int(math.log(duration, 50)), self.LineHeight)
+                dc.DrawRectangle(0, self.LineHeight * i, int(duration * 1000 / 21600), self.LineHeight)
+                dc.DrawText(f"{data}", 20, self.LineHeight * i)
+                dc.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 450, self.LineHeight * i)
 
         # for key, value in self.apps.items():
         #     width = value["time"]
@@ -264,15 +393,18 @@ class MainWindow(wx.Frame):
         print("ccccccccccccc")
         self.Close()
 
+    def break_begin(self, event):
+        frame = DarkWindow(self, "Focus mode33", self.spin_ctrl2.GetValue())
+        wx.Event.Skip(event)
+
     def lmb_pressed(self, event):
         print("LMB pressed")
+        self.Refresh()
+        wx.Event.Skip(event)
+        # self.break_begin(event)
         # self.Refresh()
-        frame = DarkWindow(self, "Focus mode33")
         # frame.Centre()
         # frame.Show(True)
-
-
-        wx.Event.Skip(event)
 
         # wx.StaticText(self, id=14, label="Heydddddyy678")
         # self.tx1.SetLabel("ffffff")
@@ -304,12 +436,12 @@ class MainWindow(wx.Frame):
         from data 
         group by full_name 
         order by sum(julianday(time_end)-julianday(time_start)) desc""")
+        print("Loaded from db")
         return database_cursor.fetchall()
         # [print(x) for x in self.all_rows]
 
     def func1(self, event):
         # print(event.GetId())
-        # print("Func called")
         # appName, windowName = getActiveWindow()
         self.save_to_db()
 
@@ -329,6 +461,8 @@ class MainWindow(wx.Frame):
                                             (number_of_rows + 1, self.LastActiveWindow, self.TimeAppOpened,
                                              datetime.datetime.now()))
                     database_connection.commit()
+                    self.new_line_added_to_db = True
+                    print("Saved to db")
                 self.LastActiveWindow = full_app_name
                 self.TimeAppOpened = datetime.datetime.now()
 

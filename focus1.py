@@ -1,8 +1,8 @@
 # from time import sleep
 
 import psutil
-# import ctypes
-# from ctypes import wintypes
+import ctypes
+from ctypes import wintypes
 
 # for i in range(1, 100000000):
 #     pid = wintypes.DWORD()
@@ -44,9 +44,9 @@ def get_active_window():
     # print(active_window_name)
 
     pid = wintypes.DWORD()
-    # active = ctypes.windll.user32.GetForegroundWindow()
-    # active_window = ctypes.windll.user32.GetWindowThreadProcessId(active, ctypes.byref(pid))
-
+    active = ctypes.windll.user32.GetForegroundWindow()
+    active_window = ctypes.windll.user32.GetWindowThreadProcessId(active, ctypes.byref(pid))
+    # print(active_window)
     pid = pid.value
     for item in psutil.process_iter():
         # print(item.name())
@@ -94,15 +94,16 @@ if __name__ == "__main__":
 
     w = win32gui
     a = w.GetWindowText(w.GetForegroundWindow())
-    print(a)
+    # print(a)
 
     import pyautogui
 
     window_title = pyautogui.getActiveWindowTitle()
-    print(window_title)
+    # print(window_title)
 
-    for i in range(1, 100000000):
-        get_active_window()
+    # for i in range(1, 100000000):
+    #     print(get_active_window())
+
 
 # from PyQt5.QtWidgets import QWidget, QApplication, QMessageBox
 #
