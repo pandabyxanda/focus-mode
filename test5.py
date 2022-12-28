@@ -12,10 +12,10 @@ class MainWindow(wx.Frame):
 
         tabs = wx.Notebook(self.panel1, id=wx.ID_ANY)
 
-        vbox_main = wx.BoxSizer(wx.VERTICAL)
-        vbox_main.Add(tabs, 1, wx.ALL | wx.EXPAND, 5)
+        vbox_main9 = wx.BoxSizer(wx.VERTICAL)
+        vbox_main9.Add(tabs, 1, wx.ALL | wx.EXPAND, 5)
 
-        self.panel1.SetSizer(vbox_main)
+        self.panel1.SetSizer(vbox_main9)
         self.panel1.SetBackgroundColour("#2222fe")
 
         scrolled_window = scrolled.ScrolledPanel(tabs, wx.ID_ANY)
@@ -25,41 +25,17 @@ class MainWindow(wx.Frame):
         self.panel2 = wx.Panel(tabs)
         tabs.AddPage(self.panel2, "Tab 2", False)
 
-        # vbox_main = wx.BoxSizer(wx.VERTICAL)
-        # vbox_main.Add(tabs, 1, wx.ALL | wx.EXPAND, 5)
-        vbox_main1 = wx.BoxSizer(wx.VERTICAL)
-        # vbox_main1.Add(scrolled_window, 1, wx.ALL | wx.EXPAND, 5)
-        #
-        self.panel5 = wx.Panel(scrolled_window, size=(300, 150))
-        self.panel5.SetSizer(vbox_main1)
-        self.panel5.SetBackgroundColour("#2222fe")
-
-
-        # vbox_main = wx.BoxSizer(wx.VERTICAL)
-        # self.panel1.SetSizer(vbox_main)
-        self.pn1_main = wx.Panel(self.panel5, size=(200, 100))
-        self.pn2_main = wx.Panel(self.panel5, size=(200, 100))
+        vbox_main = wx.BoxSizer(wx.VERTICAL)
+        scrolled_window.SetSizer(vbox_main)
+        self.pn1_main = wx.Panel(scrolled_window, size=(200, 100))
+        self.pn2_main = wx.Panel(scrolled_window, size=(200, 100))
         hbox_main = wx.BoxSizer(wx.HORIZONTAL)
-        vbox_main1.Add(hbox_main, flag=wx.EXPAND | wx.ALIGN_LEFT, border=10, proportion=1)
+        vbox_main.Add(hbox_main, flag=wx.EXPAND | wx.ALIGN_LEFT, border=10, proportion=1)
 
         hbox_main.Add(self.pn1_main, flag=wx.EXPAND, border=10, proportion=1)
-        hbox_main.Add(self.pn2_main, flag=wx.EXPAND, border=10, proportion=1)
+        hbox_main.Add(self.pn2_main, flag=wx.EXPAND, border=10)
         self.pn1_main.SetBackgroundColour("#dfedfd")
         self.pn2_main.SetBackgroundColour("#e7f2fe")
-
-
-
-        # vbox_main1.Add(self.panel5, 1, wx.ALL | wx.EXPAND, 5)
-        # self.pn1_main = wx.Panel(scrolled_window, size=(300, 150))
-        # self.pn2_main = wx.Panel(scrolled_window, size=(200, 100))
-        #
-        # hbox_main = wx.BoxSizer(wx.HORIZONTAL)
-        # vbox_main1.Add(hbox_main, flag=wx.EXPAND | wx.ALIGN_LEFT, border=10, proportion=1)
-        #
-        # hbox_main.Add(self.pn1_main, flag=wx.EXPAND, border=10, proportion=1)
-        # hbox_main.Add(self.pn2_main, flag=wx.EXPAND, border=10)
-        # self.pn1_main.SetBackgroundColour("#dfedfd")
-        # self.pn2_main.SetBackgroundColour("#6662fe")
 
         button = wx.Button(scrolled_window, wx.ID_ANY, "str(btn)", pos=(300, 200))
 

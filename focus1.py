@@ -63,28 +63,23 @@ def get_active_window():
         res = None
 
     # make names more convenient to understand
-
+    # if len(res) > 3:
+    #     res = res[0:3]
     if len(res) >= 2:
         if res[0] == 'chrome.exe':
             res.pop(0)
-            if len(res) > 2:
-                res = res[0:2]
-            # if res[1] == 'YouTube':
-            #     res = res[0:2]
         elif res[0] == 'explorer.exe':
             res = res[0:1]
-            # res.pop(0)
-            # if res[0] == 'Program Manager':
-            #     res = ["Desktop"]
-            # else:
-            #     res = ["Folders"]
+        elif res[0] == 'ApplicationFrameHost.exe':
+            res = res[1]
         else:
-            if len(res) > 2:
-                res = res[0:2]
-
-        if len(res) > 1 and res[1].lower().replace(" ", "") in res[0].lower():
-            res.pop(0)
-
+            if len(res) > 1 and res[1].lower().replace(" ", "") in res[0].lower():
+                res = res[1:2]
+            # if len(res) > 1:
+            #     res = res[0:1]
+    if res:
+        for i, v in enumerate(res):
+            res[i] = v.replace("-", " ")
     # print(res)
     return res
 

@@ -7,6 +7,7 @@ import sqlite3
 import datetime
 import time
 from focus1 import get_active_window
+import wx.lib.mixins.inspection
 import screen_brightness_control
 
 TRAY_TOOLTIP = 'Name'
@@ -148,8 +149,11 @@ class MainWindow(wx.Frame):
         self.LastActiveWindow = None
         self.TimeAppOpened = datetime.datetime.now()
         self.all_rows = self.get_rows_from_database()
+        database_cursor.execute("""select max(id) from data""")
+        self.max_id = database_cursor.fetchone()[0]
         self.new_line_added_to_db = False
-
+        self.line_height = 30
+        self.max_rows_to_show_on_main = 40
 
 
         # screen_size = wx.GetDisplaySize()
@@ -172,33 +176,87 @@ class MainWindow(wx.Frame):
         # self.scroll = wx.ScrolledWindow(self)
         # self.scroll.SetScrollbars(1, 1, 1600, 1400)
 
-        tabs = wx.Notebook(self, id=wx.ID_ANY)
-        self.panel1 = wx.Panel(tabs)
-        self.panel1.SetBackgroundColour("#f1f7fe")
+        # =================
+        # self.panel1 = wx.Panel(self)
+        #
+        # tabs = wx.Notebook(self.panel1, id=wx.ID_ANY)
+        #
+        # vbox_main = wx.BoxSizer(wx.VERTICAL)
+        # vbox_main.Add(tabs, 1, wx.ALL | wx.EXPAND, 5)
+        #
+        # self.panel1.SetSizer(vbox_main)
+        # self.panel1.SetBackgroundColour("#2222fe")
+        #
+        # scrolled_window = scrolled.ScrolledPanel(tabs, wx.ID_ANY)
+        # scrolled_window.SetupScrolling()
+        #
+        # tabs.AddPage(scrolled_window, "Tab %d", False)
+        # self.panel2 = wx.Panel(tabs)
+        # tabs.AddPage(self.panel2, "Tab 2", False)
 
-        # self.panel1 = wx.ScrolledWindow(tabs)
-        # self.panel1.SetScrollbars(1, 1, 20, 20)
-
-
-
+        self.panel1 = wx.Panel(self)
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
         font.SetPointSize(14)
         self.panel1.SetFont(font)
 
+        tabs = wx.Notebook(self.panel1, id=wx.ID_ANY)
+        tabs.SetBackgroundColour("#dfedfd")
+        # tabs.SetOwnForegroundColour("#dfedfd")
 
-        tabs.InsertPage(0, self.panel1, "Tracker", select=False)
+        vbox_main9 = wx.BoxSizer(wx.VERTICAL)
+        vbox_main9.Add(tabs, 1, wx.ALL | wx.EXPAND, 0)
+
+        self.panel1.SetSizer(vbox_main9)
+        # self.panel1.SetBackgroundColour("#dfedfd")
+
+        scrolled_window = scrolled.ScrolledPanel(tabs, wx.ID_ANY)
+        scrolled_window.SetupScrolling(scroll_x=False, scroll_y=True)
+
+        tabs.AddPage(scrolled_window, "Tracker", select=True)
+        # self.panel2 = wx.Panel(tabs)
+        # tabs.AddPage(self.panel2, "Tab 2", False)
 
         vbox_main = wx.BoxSizer(wx.VERTICAL)
-        self.panel1.SetSizer(vbox_main)
-        self.pn1_main = wx.Panel(self.panel1, size=(200, 100))
-        self.pn2_main = wx.Panel(self.panel1, size=(200, 100))
+        scrolled_window.SetSizer(vbox_main)
+        self.pn1_main = wx.Panel(scrolled_window,
+                                 size=(200, min(self.max_rows_to_show_on_main, len(self.all_rows)) * self.line_height))
+        self.pn2_main = wx.Panel(scrolled_window, size=(200, 0))
         hbox_main = wx.BoxSizer(wx.HORIZONTAL)
-        vbox_main.Add(hbox_main, flag=wx.EXPAND | wx.ALIGN_LEFT, border=10, proportion=1)
+        vbox_main.Add(hbox_main, flag=wx.EXPAND | wx.ALIGN_LEFT, border=0)
 
-        hbox_main.Add(self.pn1_main, flag=wx.EXPAND, border=10, proportion=1)
-        hbox_main.Add(self.pn2_main, flag=wx.EXPAND, border=10)
+        hbox_main.Add(self.pn1_main, flag=wx.EXPAND, border=0, proportion=1)
+        hbox_main.Add(self.pn2_main, flag=wx.EXPAND, border=0)
         self.pn1_main.SetBackgroundColour("#dfedfd")
         self.pn2_main.SetBackgroundColour("#e7f2fe")
+
+
+        # tabs = wx.Notebook(self, id=wx.ID_ANY)
+        # self.panel1 = wx.Panel(tabs)
+        # self.panel1.SetBackgroundColour("#f1f7fe")
+        #
+        # # self.panel1 = wx.ScrolledWindow(tabs)
+        # # self.panel1.SetScrollbars(1, 1, 20, 20)
+        #
+        #
+        #
+        # font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+        # font.SetPointSize(14)
+        # self.panel1.SetFont(font)
+        #
+        #
+        # tabs.InsertPage(0, self.panel1, "Tracker", select=True)
+        #
+        # vbox_main = wx.BoxSizer(wx.VERTICAL)
+        # self.panel1.SetSizer(vbox_main)
+        # self.pn1_main = wx.Panel(self.panel1, size=(200, 100))
+        # self.pn2_main = wx.Panel(self.panel1, size=(200, 100))
+        # hbox_main = wx.BoxSizer(wx.HORIZONTAL)
+        # vbox_main.Add(hbox_main, flag=wx.EXPAND | wx.ALIGN_LEFT, border=10, proportion=1)
+        #
+        # hbox_main.Add(self.pn1_main, flag=wx.EXPAND, border=10, proportion=1)
+        # hbox_main.Add(self.pn2_main, flag=wx.EXPAND, border=10)
+        # self.pn1_main.SetBackgroundColour("#dfedfd")
+        # self.pn2_main.SetBackgroundColour("#e7f2fe")
 
 
 
@@ -207,9 +265,10 @@ class MainWindow(wx.Frame):
         self.panel2.SetFont(font)
 
         self.panel2.SetBackgroundColour("#f1f7fe")
-        tabs.InsertPage(1, self.panel2, "Relax", select=True)
+        # tabs.InsertPage(1, self.panel2, "Relax", select=False)
+        tabs.AddPage(self.panel2, "Relax", select=False)
 
-        self.LineHeight = 30
+
         # self.Show(True)
         # self.SetTransparent(205)
         # self.SetBackgroundColour("#367bef")
@@ -384,6 +443,8 @@ class MainWindow(wx.Frame):
 
     def on_paint1(self, event):
         print("onPaint1")
+        width_of_panel_with_names = self.pn1_main.GetVirtualSize()[0]
+        # print("size = ", self.pn1_main.GetVirtualSize())
         # print(event)
         # self.task_bar_icon.set_icon(TRAY_ICON2)
         if self.new_line_added_to_db == True:
@@ -404,14 +465,22 @@ class MainWindow(wx.Frame):
         for i, row in enumerate(self.all_rows):
             data = row[0]
             duration = row[1]
-            if i >= 40:
+            if i >= self.max_rows_to_show_on_main:
                 break
-            if len(data) > 40:
-                data = data[:40] + "..."
+            if dc.GetTextExtent(data)[0] > width_of_panel_with_names-35:
+                while dc.GetTextExtent(data)[0] > width_of_panel_with_names-35:
+                    data = data[:len(data)-1]
+                    # print(len(data))
+                    # print(len(data)-(dc.GetTextExtent(data)[0]-width_of_panel_with_names) // (dc.GetTextExtent(data)[0] // len(data)))
+                    # print(len(data))
+                    # data = data[:len(data)-(dc.GetTextExtent(data)[0]-width_of_panel_with_names) // (dc.GetTextExtent(data)[0] // len(data))-5] + "..."
+                data = data[:len(data)]+'...'
             if duration > 0:
                 # dc.DrawRectangle(0, self.LineHeight * i, int(math.log(duration, 50)), self.LineHeight)
-                dc.DrawRectangle(0, self.LineHeight * i, int(duration * 1000 / 21600), self.LineHeight)
-                dc.DrawText(f"{data}", 20, self.LineHeight * i)
+                dc.DrawRectangle(0, self.line_height * i, int(duration * 1000 / 21600), self.line_height)
+                f = dc.DrawText(f"{data}", 20, self.line_height * i)
+                # print(dc.GetTextExtent(data))
+
                 # dc2.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 450, self.LineHeight * i)
 
         # for key, value in self.apps.items():
@@ -441,9 +510,9 @@ class MainWindow(wx.Frame):
         # self.apps = {k: v for k, v in sorted(self.apps.items(), key=lambda item: item[1]['time'], reverse=True)}
         for i, row in enumerate(self.all_rows):
             duration = row[1]
-            if i >= 40:
+            if i >= self.max_rows_to_show_on_main:
                 break
-            dc2.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 10, self.LineHeight * i)
+            dc2.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 10, self.line_height * i)
 
     def on_quit(self, event):
         print(event)
@@ -489,10 +558,42 @@ class MainWindow(wx.Frame):
 
     @staticmethod
     def get_rows_from_database():
-        database_cursor.execute("""select full_name, sum((julianday(time_end)-julianday(time_start))*24*60*60) 
-        from data 
-        group by full_name 
-        order by sum(julianday(time_end)-julianday(time_start)) desc""")
+        # database_cursor.execute("""select full_name, sum((julianday(time_end)-julianday(time_start))*24*60*60)
+        # from data
+        # group by full_name
+        # order by sum(julianday(time_end)-julianday(time_start)) desc""")
+
+        database_cursor.execute("""
+        select REPLACE(f, '.exe', '') as ff, d from
+        (
+        select 
+        substr(full_name, 1, INSTR(full_name, "-")-1) || 
+        " " || 
+        trim(substr(substr(full_name, INSTR(full_name, "-")+1, length(full_name)), 1, INSTR(substr(full_name, INSTR(full_name, "-")+1, length(full_name)), "-")), "-") as f, 
+        sum(julianday(time_end)-julianday(time_start))*24*60*60 as d 
+        from data
+        where substr(full_name, 1, 13) = "Google Chrome"
+        group by full_name
+
+        union
+
+        select substr(full_name, 1, INSTR(full_name, "-")-1) as f, sum(julianday(time_end)-julianday(time_start))*24*60*60 as d 
+        from data
+        where substr(full_name, 1, 13) != "Google Chrome" and full_name like "%-%"
+        group by substr(full_name, 1, INSTR(full_name, "-")-1)
+
+        UNION
+
+        select full_name as f, sum(julianday(time_end)-julianday(time_start))*24*60*60 as d 
+        from data
+        where substr(full_name, 1, 13) != "Google Chrome" and full_name not like "%-%"
+        group by full_name
+        )
+        where d >= 5
+        group by f
+        order by d desc
+        """)
+
         print("Loaded from db")
         return database_cursor.fetchall()
         # [print(x) for x in self.all_rows]
@@ -505,21 +606,25 @@ class MainWindow(wx.Frame):
     def save_to_db(self):
         active_window = get_active_window()
         if active_window:
-            full_app_name = ' '.join(active_window)
+            full_app_name = '-'.join(active_window)
             if full_app_name != self.LastActiveWindow:
-                if self.LastActiveWindow:
-                    database_cursor.execute("select count(*) from data")
-                    number_of_rows = database_cursor.fetchone()[0]
-                    # print(f"{number_of_rows = }")
-                    database_cursor.execute("""
-                        INSERT INTO data VALUES
-                            (?, ?, ?, ?, NULL)
-                    """,
-                                            (number_of_rows + 1, self.LastActiveWindow, self.TimeAppOpened,
-                                             datetime.datetime.now()))
-                    database_connection.commit()
-                    self.new_line_added_to_db = True
-                    print("Saved to db")
+                print("act wind changed")
+                if datetime.datetime.now()-self.TimeAppOpened > datetime.timedelta(seconds = 5):
+                    if self.LastActiveWindow:
+                        database_cursor.execute("select count(*) from data")
+                        number_of_rows = database_cursor.fetchone()[0]
+                        # print(f"{number_of_rows = }")
+                        self.max_id += 1
+                        database_cursor.execute("""
+                            INSERT INTO data VALUES
+                                (?, ?, ?, ?, NULL)
+                        """,
+                                                (self.max_id, self.LastActiveWindow, self.TimeAppOpened,
+                                                 datetime.datetime.now()))
+                        database_connection.commit()
+                        self.new_line_added_to_db = True
+                        print("Saved to db")
+
                 self.LastActiveWindow = full_app_name
                 self.TimeAppOpened = datetime.datetime.now()
 
@@ -544,6 +649,7 @@ class App(wx.App):
         frame = MainWindow(None, "Focus mode")
         frame.Centre()
         frame.Show(True)
+        # wx.lib.inspection.InspectionTool().Show()
         self.SetTopWindow(frame)
         TaskBarIcon(frame)
         return True
