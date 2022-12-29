@@ -71,7 +71,7 @@ def get_active_window():
         elif res[0] == 'explorer.exe':
             res = res[0:1]
         elif res[0] == 'ApplicationFrameHost.exe':
-            res = res[1]
+            res = res[1:2]
         else:
             if len(res) > 1 and res[1].lower().replace(" ", "") in res[0].lower():
                 res = res[1:2]

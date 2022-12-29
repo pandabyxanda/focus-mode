@@ -8,11 +8,13 @@ import datetime
 import time
 from focus1 import get_active_window
 import wx.lib.mixins.inspection
+import sql
 import screen_brightness_control
 
 TRAY_TOOLTIP = 'Name'
 TRAY_ICON = 'star.png'
 TRAY_ICON2 = 'star (2).png'
+DATABASE_NAME = "database.db"
 
 
 # TODO: using this tool
@@ -74,7 +76,7 @@ class DarkWindow(wx.Frame):
 
         print(screen_size)
         wx.Frame.__init__(self, parent, title=title, size=(400, 400), pos=(0, 0),
-                          style=wx.DEFAULT_FRAME_STYLE & ~wx.CAPTION | wx.FRAME_FLOAT_ON_PARENT)
+                          style=wx.DEFAULT_FRAME_STYLE & ~wx.CAPTION | wx.FRAME_FLOAT_ON_PARENT | wx.STAY_ON_TOP)
         # wx.Frame.__init__(self, parent, title=title, size=screen_size, pos=(0,0),
         #                   style=wx.MINIMIZE_BOX | wx.RESIZE_BORDER | wx.CAPTION
         #                         | wx.CLOSE_BOX | wx.CLIP_CHILDREN | wx.FRAME_FLOAT_ON_PARENT)
@@ -88,6 +90,7 @@ class DarkWindow(wx.Frame):
         self.SetTransparent(self.opacity)
         self.Centre()
         self.Show()
+        self.Iconize(False)
 
         self.timer2 = wx.Timer(self, id=104)
         self.timer2.Start(1000)
@@ -144,16 +147,17 @@ class DarkWindow(wx.Frame):
 
 
 class MainWindow(wx.Frame):
-    def __init__(self, parent, title):
+    def __init__(self, parent, title, db):
         self.Button1Name = "but1"
+        self.db = db
         self.LastActiveWindow = None
         self.TimeAppOpened = datetime.datetime.now()
-        self.all_rows = self.get_rows_from_database()
-        database_cursor.execute("""select max(id) from data""")
-        self.max_id = database_cursor.fetchone()[0]
+
+
+        self.max_id = self.db.query_select_max_id()
         self.new_line_added_to_db = False
         self.line_height = 30
-        self.max_rows_to_show_on_main = 40
+        self.max_rows_to_show_on_main = 200
 
 
         # screen_size = wx.GetDisplaySize()
@@ -172,97 +176,84 @@ class MainWindow(wx.Frame):
 
 
         self.SetIcon(wx.Icon('favicon.ico', wx.BITMAP_TYPE_ICO))
-        # self.CreateStatusBar() # A Statusbar in the bottom of the window
-        # self.scroll = wx.ScrolledWindow(self)
-        # self.scroll.SetScrollbars(1, 1, 1600, 1400)
-
-        # =================
-        # self.panel1 = wx.Panel(self)
-        #
-        # tabs = wx.Notebook(self.panel1, id=wx.ID_ANY)
-        #
-        # vbox_main = wx.BoxSizer(wx.VERTICAL)
-        # vbox_main.Add(tabs, 1, wx.ALL | wx.EXPAND, 5)
-        #
-        # self.panel1.SetSizer(vbox_main)
-        # self.panel1.SetBackgroundColour("#2222fe")
-        #
-        # scrolled_window = scrolled.ScrolledPanel(tabs, wx.ID_ANY)
-        # scrolled_window.SetupScrolling()
-        #
-        # tabs.AddPage(scrolled_window, "Tab %d", False)
-        # self.panel2 = wx.Panel(tabs)
-        # tabs.AddPage(self.panel2, "Tab 2", False)
 
         self.panel1 = wx.Panel(self)
-        font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-        font.SetPointSize(14)
-        self.panel1.SetFont(font)
+        self.font1 = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+        self.font1.SetPointSize(14)
+        self.font2 = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+        self.font2.SetPointSize(14)
+        self.font2.MakeBold()
+        self.panel1.SetFont(self.font1)
 
         tabs = wx.Notebook(self.panel1, id=wx.ID_ANY)
-        tabs.SetBackgroundColour("#dfedfd")
+        # tabs.
+        # tabs.SetBackgroundColour("#dfedfd")
         # tabs.SetOwnForegroundColour("#dfedfd")
 
-        vbox_main9 = wx.BoxSizer(wx.VERTICAL)
-        vbox_main9.Add(tabs, 1, wx.ALL | wx.EXPAND, 0)
+        # creating tab 1
+        self.vbox_main9 = wx.BoxSizer(wx.VERTICAL)
+        self.vbox_main9.Add(tabs, 1, wx.ALL | wx.EXPAND, 0)
 
-        self.panel1.SetSizer(vbox_main9)
+        self.panel1.SetSizer(self.vbox_main9)
         # self.panel1.SetBackgroundColour("#dfedfd")
 
-        scrolled_window = scrolled.ScrolledPanel(tabs, wx.ID_ANY)
-        scrolled_window.SetupScrolling(scroll_x=False, scroll_y=True)
+        self.scrolled_window = scrolled.ScrolledPanel(tabs, wx.ID_ANY)
+        self.scrolled_window.SetupScrolling(scroll_x=False, scroll_y=True)
 
-        tabs.AddPage(scrolled_window, "Tracker", select=True)
+        tabs.AddPage(self.scrolled_window, "Tracker", select=True)
         # self.panel2 = wx.Panel(tabs)
         # tabs.AddPage(self.panel2, "Tab 2", False)
 
-        vbox_main = wx.BoxSizer(wx.VERTICAL)
-        scrolled_window.SetSizer(vbox_main)
-        self.pn1_main = wx.Panel(scrolled_window,
-                                 size=(200, min(self.max_rows_to_show_on_main, len(self.all_rows)) * self.line_height))
-        self.pn2_main = wx.Panel(scrolled_window, size=(200, 0))
-        hbox_main = wx.BoxSizer(wx.HORIZONTAL)
-        vbox_main.Add(hbox_main, flag=wx.EXPAND | wx.ALIGN_LEFT, border=0)
+        self.vbox_main = wx.BoxSizer(wx.VERTICAL)
+        self.scrolled_window.SetSizer(self.vbox_main)
 
-        hbox_main.Add(self.pn1_main, flag=wx.EXPAND, border=0, proportion=1)
-        hbox_main.Add(self.pn2_main, flag=wx.EXPAND, border=0)
+
+
+        self.pn3_main = wx.Panel(self.scrolled_window,
+                                 size=wx.DefaultSize)
+        self.datePicker1 = wx.adv.DatePickerCtrl(self.pn3_main, wx.ID_ANY, wx.DefaultDateTime, wx.DefaultPosition,
+                                                   wx.DefaultSize, wx.adv.DP_DEFAULT)
+        # self.pn3_main.SetBackgroundColour("#4444fe")
+        self.hbox_main3 = wx.BoxSizer(wx.HORIZONTAL)
+        self.hbox_main3.Add(self.datePicker1, border=0)
+        self.checkBox1 = wx.CheckBox(self.pn3_main, wx.ID_ANY, u"Extended", wx.DefaultPosition, wx.DefaultSize, style=wx.ALIGN_RIGHT)
+        self.hbox_main3.Add(self.checkBox1, flag=wx.EXPAND | wx.LEFT, border=50)
+        self.pn3_main.SetSizer(self.hbox_main3)
+        self.vbox_main.Add(self.pn3_main, flag=wx.ALIGN_CENTER | wx.DOWN | wx.UP, border=5)
+
+
+
+
+
+        self.pn1_main = wx.Panel(self.scrolled_window,
+                                 size=(200, 0))
+
+        self.pn2_main = wx.Panel(self.scrolled_window, size=(200, 0))
+
+        self.hbox_main = wx.BoxSizer(wx.HORIZONTAL)
+        self.vbox_main.Add(self.hbox_main, flag=wx.EXPAND | wx.ALIGN_LEFT, border=0)
+
+        self.hbox_main.Add(self.pn1_main, flag=wx.EXPAND, border=0, proportion=1)
+        self.hbox_main.Add(self.pn2_main, flag=wx.EXPAND, border=0)
         self.pn1_main.SetBackgroundColour("#dfedfd")
-        self.pn2_main.SetBackgroundColour("#e7f2fe")
+        self.pn2_main.SetBackgroundColour("#dfedfd")
 
+        self.all_rows = self.get_rows_from_database()
+        self.check_box_pressed = False
 
-        # tabs = wx.Notebook(self, id=wx.ID_ANY)
-        # self.panel1 = wx.Panel(tabs)
-        # self.panel1.SetBackgroundColour("#f1f7fe")
+        # size1 = (100, 100)
         #
-        # # self.panel1 = wx.ScrolledWindow(tabs)
-        # # self.panel1.SetScrollbars(1, 1, 20, 20)
-        #
-        #
-        #
-        # font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-        # font.SetPointSize(14)
-        # self.panel1.SetFont(font)
-        #
-        #
-        # tabs.InsertPage(0, self.panel1, "Tracker", select=True)
-        #
-        # vbox_main = wx.BoxSizer(wx.VERTICAL)
-        # self.panel1.SetSizer(vbox_main)
-        # self.pn1_main = wx.Panel(self.panel1, size=(200, 100))
-        # self.pn2_main = wx.Panel(self.panel1, size=(200, 100))
-        # hbox_main = wx.BoxSizer(wx.HORIZONTAL)
-        # vbox_main.Add(hbox_main, flag=wx.EXPAND | wx.ALIGN_LEFT, border=10, proportion=1)
-        #
-        # hbox_main.Add(self.pn1_main, flag=wx.EXPAND, border=10, proportion=1)
-        # hbox_main.Add(self.pn2_main, flag=wx.EXPAND, border=10)
-        # self.pn1_main.SetBackgroundColour("#dfedfd")
-        # self.pn2_main.SetBackgroundColour("#e7f2fe")
-
-
+        # self.pn1_main.SetMinSize(size1)
+        # self.pn2_main.SetSize(size1)
+        # hbox_main.Fit(self.pn1_main)
+        # hbox_main.Fit(self.pn2_main)
+        # vbox_main.Fit(self.scrolled_window)
+        # self.SetSize(size1)
+        # self.panel1.SetSize(size1)
 
         self.panel2 = wx.Panel(tabs)
 
-        self.panel2.SetFont(font)
+        self.panel2.SetFont(self.font1)
 
         self.panel2.SetBackgroundColour("#f1f7fe")
         # tabs.InsertPage(1, self.panel2, "Relax", select=False)
@@ -273,8 +264,8 @@ class MainWindow(wx.Frame):
         # self.SetTransparent(205)
         # self.SetBackgroundColour("#367bef")
 
-        # self.Bind(wx.EVT_MENU, self.onQuit, id=wx.ID_EXIT)
-        # self.Bind(wx.EVT_COMMAND_LEFT_CLICK, self.LMBpressed)
+
+
         self.panel1.Bind(wx.EVT_LEFT_DOWN, self.lmb_pressed)
         # self.Bind(wx.EVT_BUTTON, self.onButton1, id=self.btn1.GetId())
 
@@ -285,6 +276,11 @@ class MainWindow(wx.Frame):
         # self.Bind(wx.EVT_CLOSE, self.on_exit)
 
         self.Bind(wx.EVT_CLOSE, self.on_minimize)
+        self.Bind(wx.EVT_CLOSE, self.on_minimize)
+        self.Bind(wx.EVT_CHECKBOX, self.on_check_box)
+        self.datePicker1.Bind(wx.adv.EVT_DATE_CHANGED, self.on_date_picker)
+
+
 
         self.pn1_main.Bind(wx.EVT_PAINT, self.on_paint1)
         self.pn2_main.Bind(wx.EVT_PAINT, self.on_paint2)
@@ -362,6 +358,13 @@ class MainWindow(wx.Frame):
         hbox5.Add(self.button_start, flag=wx.LEFT | wx.TOP, border=10)
         vbox.Add(hbox5, flag=wx.ALL | wx.ALIGN_CENTER, border=10)
 
+        hbox6 = wx.BoxSizer(wx.HORIZONTAL)
+        self.m_calendar1 = wx.adv.CalendarCtrl(self.panel2, wx.ID_ANY, wx.DefaultDateTime, wx.DefaultPosition,
+                                               wx.DefaultSize, wx.adv.CAL_SHOW_HOLIDAYS)
+        hbox6.Add(self.m_calendar1, flag=wx.LEFT | wx.TOP, border=10)
+        vbox.Add(hbox6, flag=wx.ALL | wx.ALIGN_CENTER, border=10)
+
+
         self.panel2.Bind(wx.EVT_BUTTON, self.break_begin, id=91)
 
         # print(self.spin_ctrl1.GetValue())
@@ -378,23 +381,18 @@ class MainWindow(wx.Frame):
         self.Bind(wx.EVT_TIMER, self.time_till_break, id=61)
         self.Bind(wx.EVT_SPINCTRL, self.on_spinctrl1, id=71)
 
-        # self.list = wx.ListCtrl(self.panel2, wx.ID_ANY, style=wx.LC_REPORT, size=(600, 200))
-        # self.list.SetFont(wx.Font(wx.FontInfo(12)))
-        # self.list.SetBackgroundColour("#f0f0f0")
-        #
-        # self.list.InsertColumn(0, 'Название', width=100)
-        # self.list.InsertColumn(1, 'Автор', width=100)
-        # self.list.InsertColumn(2, 'Год издания', wx.LIST_FORMAT_RIGHT, 140)
-        # self.list.InsertColumn(3, 'Цена', wx.LIST_FORMAT_RIGHT, 90)
-        #
-        # books = [('Евгений Онегин', 'Пушкин А.С.', 2000, 192),
-        #          ('Пиковая дама', 'Пушкин А.С.', 2004, 150.53),
-        #          ('Мастер и Маргарита', 'Булгаков М.А.', 2005, 500),
-        #          ('Роковые яйца', 'Булгаков М.А.', 2003, 400),
-        #          ('Белая гвардия', 'Булгаков М.А.', 2010, 340)]
-        #
-        # for b in books:
-        #     self.list.Append(b)
+    def on_date_picker(self, event):
+        a = self.datePicker1.GetValue()
+        print(f"{a = }")
+        b = wx.DateTime.FormatISOCombined(a).replace("-", ":").replace("T", " ")
+        # b = f"{time.strftime('%H:%M:%S', time.gmtime(b))}"
+        print(f"{b = }")
+
+    def on_check_box(self, event):
+        # self.v = self.checkBox1.GetValue()
+        self.check_box_pressed = True
+        self.Refresh()
+
 
     def on_spinctrl1(self, event):
         self.time_before_break = self.spin_ctrl1.GetValue()
@@ -447,13 +445,16 @@ class MainWindow(wx.Frame):
         # print("size = ", self.pn1_main.GetVirtualSize())
         # print(event)
         # self.task_bar_icon.set_icon(TRAY_ICON2)
-        if self.new_line_added_to_db == True:
+        if self.new_line_added_to_db == True or self.check_box_pressed == True:
             self.all_rows = self.get_rows_from_database()
             self.new_line_added_to_db = False
+            self.check_box_pressed = False
 
         dc = wx.PaintDC(self.pn1_main)
         # dc2 = wx.PaintDC(self.pn2_main)
         dc.SetPen(wx.Pen('#fdc073', style=wx.TRANSPARENT))
+
+
 
         dc.DrawLine(0, 0, 500, 700)
         dc.SetBrush(wx.Brush('#d5dde6', wx.SOLID))
@@ -462,10 +463,13 @@ class MainWindow(wx.Frame):
 
         # [print(x) for x in self.all_rows]
         # self.apps = {k: v for k, v in sorted(self.apps.items(), key=lambda item: item[1]['time'], reverse=True)}
+
         for i, row in enumerate(self.all_rows):
             data = row[0]
             duration = row[1]
+            # print(f"{duration = }")
             if i >= self.max_rows_to_show_on_main:
+                print(f"{self.max_rows_to_show_on_main = }")
                 break
             if dc.GetTextExtent(data)[0] > width_of_panel_with_names-35:
                 while dc.GetTextExtent(data)[0] > width_of_panel_with_names-35:
@@ -477,8 +481,13 @@ class MainWindow(wx.Frame):
                 data = data[:len(data)]+'...'
             if duration > 0:
                 # dc.DrawRectangle(0, self.LineHeight * i, int(math.log(duration, 50)), self.LineHeight)
-                dc.DrawRectangle(0, self.line_height * i, int(duration * 1000 / 21600), self.line_height)
-                f = dc.DrawText(f"{data}", 20, self.line_height * i)
+                if i != len(self.all_rows)-1:
+                    dc.DrawRectangle(0, self.line_height * i, int(duration * 1000 / 21600), self.line_height)
+                    f = dc.DrawText(f"{data}", 20, self.line_height * i)
+                else:
+                    dc.SetFont(self.font2)
+                    f = dc.DrawText(f"{data}", 20, self.line_height * i)
+                    dc.SetFont(self.font1)
                 # print(dc.GetTextExtent(data))
 
                 # dc2.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 450, self.LineHeight * i)
@@ -512,7 +521,12 @@ class MainWindow(wx.Frame):
             duration = row[1]
             if i >= self.max_rows_to_show_on_main:
                 break
-            dc2.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 10, self.line_height * i)
+            if i == len(self.all_rows) - 1:
+                dc2.SetFont(self.font2)
+                dc2.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 10, self.line_height * i)
+                dc2.SetFont(self.font1)
+            else:
+                dc2.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 10, self.line_height * i)
 
     def on_quit(self, event):
         print(event)
@@ -556,46 +570,38 @@ class MainWindow(wx.Frame):
         # screen_brightness_control.set_brightness(prev[0])
         # print(screen_brightness_control.get_brightness())
 
-    @staticmethod
-    def get_rows_from_database():
+
+    def get_rows_from_database(self):
         # database_cursor.execute("""select full_name, sum((julianday(time_end)-julianday(time_start))*24*60*60)
         # from data
         # group by full_name
         # order by sum(julianday(time_end)-julianday(time_start)) desc""")
-
-        database_cursor.execute("""
-        select REPLACE(f, '.exe', '') as ff, d from
-        (
-        select 
-        substr(full_name, 1, INSTR(full_name, "-")-1) || 
-        " " || 
-        trim(substr(substr(full_name, INSTR(full_name, "-")+1, length(full_name)), 1, INSTR(substr(full_name, INSTR(full_name, "-")+1, length(full_name)), "-")), "-") as f, 
-        sum(julianday(time_end)-julianday(time_start))*24*60*60 as d 
-        from data
-        where substr(full_name, 1, 13) = "Google Chrome"
-        group by full_name
-
-        union
-
-        select substr(full_name, 1, INSTR(full_name, "-")-1) as f, sum(julianday(time_end)-julianday(time_start))*24*60*60 as d 
-        from data
-        where substr(full_name, 1, 13) != "Google Chrome" and full_name like "%-%"
-        group by substr(full_name, 1, INSTR(full_name, "-")-1)
-
-        UNION
-
-        select full_name as f, sum(julianday(time_end)-julianday(time_start))*24*60*60 as d 
-        from data
-        where substr(full_name, 1, 13) != "Google Chrome" and full_name not like "%-%"
-        group by full_name
-        )
-        where d >= 5
-        group by f
-        order by d desc
-        """)
+        # print(f"{self.checkBox1.GetValue() = }")
+        # print(f"{self.checkBox1.GetValue() = }")
+        if self.checkBox1.GetValue():
+            res = self.db.query_extended_load_on_date('2022-12-29 00:00:00', '2022-12-29 23:59:59')
+        else:
+            res = self.db.query_simple_load_on_date('2022-12-29 00:00:00', '2022-12-29 23:59:59')
+        self.all_rows = res
+        # print(f"{len(self.all_rows) = }")
+        self.all_rows.append(("Result:", sum([x[1] for x in self.all_rows])))
+        # print(f"{self.all_rows = }")
 
         print("Loaded from db")
-        return database_cursor.fetchall()
+
+        size1 = (100, (min(self.max_rows_to_show_on_main, len(self.all_rows))) * self.line_height)
+        size2 = (100, (min(self.max_rows_to_show_on_main, len(self.all_rows))) * self.line_height+self.pn3_main.GetSize()[1]+10)
+        self.pn1_main.SetMinSize(size1)
+        # self.SetVirtualSize(size1)
+        self.scrolled_window.SetVirtualSize(size2)
+        # self.SendSizeEvent()
+        # self.PostSizeEvent()
+        # self.Layout()
+        # self.Fit()
+        # self.vbox_main.SetMinSize(size1)
+        # self.SetSize(self.GetSize())
+        # self.Refresh()
+        return res
         # [print(x) for x in self.all_rows]
 
     def func1(self, event):
@@ -611,17 +617,9 @@ class MainWindow(wx.Frame):
                 print("act wind changed")
                 if datetime.datetime.now()-self.TimeAppOpened > datetime.timedelta(seconds = 5):
                     if self.LastActiveWindow:
-                        database_cursor.execute("select count(*) from data")
-                        number_of_rows = database_cursor.fetchone()[0]
-                        # print(f"{number_of_rows = }")
                         self.max_id += 1
-                        database_cursor.execute("""
-                            INSERT INTO data VALUES
-                                (?, ?, ?, ?, NULL)
-                        """,
-                                                (self.max_id, self.LastActiveWindow, self.TimeAppOpened,
-                                                 datetime.datetime.now()))
-                        database_connection.commit()
+                        self.db.query_save(self.max_id, self.LastActiveWindow, self.TimeAppOpened,
+                                                 datetime.datetime.now())
                         self.new_line_added_to_db = True
                         print("Saved to db")
 
@@ -645,8 +643,13 @@ class MainWindow(wx.Frame):
 
 
 class App(wx.App):
+    def __init__(self, redirect, db=None):
+
+        self.db = db
+        super().__init__(redirect=redirect)
+
     def OnInit(self):
-        frame = MainWindow(None, "Focus mode")
+        frame = MainWindow(None, "Focus mode", self.db)
         frame.Centre()
         frame.Show(True)
         # wx.lib.inspection.InspectionTool().Show()
@@ -663,18 +666,22 @@ def main():
     # frame.Centre()
     # frame.Show(True)  # Show the frame.
     # frame.Close()
-    app = App(False)
+    db = sql.DataBase(DATABASE_NAME)
+    db.connect()
+    db.create_table_if_not_exists()
+
+    app = App(redirect=False, db=db)
     app.MainLoop()
-    database_cursor.close()
+    # database_cursor.close()
 
     print('sss')
     # with open('data_file.json', 'w') as outfile:
     #     json.dump(frame.apps, outfile, indent=4)
 
 
-database_connection = sqlite3.connect("database.db")
-database_cursor = database_connection.cursor()
+# database_connection = sqlite3.connect("database.db")
+# database_cursor = database_connection.cursor()
 if __name__ == '__main__':
     main()
 
-database_cursor.close()
+# database_cursor.close()

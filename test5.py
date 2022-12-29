@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import wx
 import wx.lib.scrolledpanel as scrolled
-
+import wx.lib.mixins.inspection
 
 class MainWindow(wx.Frame):
     def __init__(self, parent):
@@ -10,48 +10,59 @@ class MainWindow(wx.Frame):
         # self.SetSizeHints(wx.DefaultSize, wx.DefaultSize)
         self.panel1 = wx.Panel(self)
 
-        tabs = wx.Notebook(self.panel1, id=wx.ID_ANY)
+        self.tabs = wx.Notebook(self.panel1, id=wx.ID_ANY)
 
-        vbox_main9 = wx.BoxSizer(wx.VERTICAL)
-        vbox_main9.Add(tabs, 1, wx.ALL | wx.EXPAND, 5)
+        self.vbox_main9 = wx.BoxSizer(wx.VERTICAL)
+        self.vbox_main9.Add(self.tabs, 1, wx.ALL | wx.EXPAND, 5)
 
-        self.panel1.SetSizer(vbox_main9)
+        self.panel1.SetSizer(self.vbox_main9)
         self.panel1.SetBackgroundColour("#2222fe")
 
-        scrolled_window = scrolled.ScrolledPanel(tabs, wx.ID_ANY)
-        scrolled_window.SetupScrolling()
+        self.scrolled_window = scrolled.ScrolledPanel(self.tabs, wx.ID_ANY)
+        self.scrolled_window.SetupScrolling()
 
-        tabs.AddPage(scrolled_window, "Tab %d", False)
-        self.panel2 = wx.Panel(tabs)
-        tabs.AddPage(self.panel2, "Tab 2", False)
+        self.tabs.AddPage(self.scrolled_window, "Tab %d", False)
+        # self.panel2 = wx.Panel(tabs)
+        # tabs.AddPage(self.panel2, "Tab 2", False)
 
-        vbox_main = wx.BoxSizer(wx.VERTICAL)
-        scrolled_window.SetSizer(vbox_main)
-        self.pn1_main = wx.Panel(scrolled_window, size=(200, 100))
-        self.pn2_main = wx.Panel(scrolled_window, size=(200, 100))
-        hbox_main = wx.BoxSizer(wx.HORIZONTAL)
-        vbox_main.Add(hbox_main, flag=wx.EXPAND | wx.ALIGN_LEFT, border=10, proportion=1)
+        self.vbox_main = wx.BoxSizer(wx.VERTICAL)
+        self.scrolled_window.SetSizer(self.vbox_main)
+        self.pn1_main = wx.Panel(self.scrolled_window, size=(200, 300))
+        self.pn2_main = wx.Panel(self.scrolled_window, size=(200, 300))
+        self.hbox_main = wx.BoxSizer(wx.HORIZONTAL)
+        self.vbox_main.Add(self.hbox_main, flag=wx.EXPAND | wx.ALIGN_LEFT, border=10, proportion=1)
 
-        hbox_main.Add(self.pn1_main, flag=wx.EXPAND, border=10, proportion=1)
-        hbox_main.Add(self.pn2_main, flag=wx.EXPAND, border=10)
+        self.hbox_main.Add(self.pn1_main, flag=wx.EXPAND, border=10, proportion=1)
+        self.hbox_main.Add(self.pn2_main, flag=wx.EXPAND, border=10)
         self.pn1_main.SetBackgroundColour("#dfedfd")
         self.pn2_main.SetBackgroundColour("#e7f2fe")
 
-        button = wx.Button(scrolled_window, wx.ID_ANY, "str(btn)", pos=(300, 200))
+        button = wx.Button(self.scrolled_window, wx.ID_ANY, "str(btn)", pos=(300, 200))
 
 
 
 
-
+        self.Bind(wx.EVT_MOVING, self.on_move)
 
 
         # self.Layout()
         # self.Refresh()
 
+    def on_move(self, event):
+        print("OnMove")
+        self.Refresh()
+        size = (300, 900)
+        self.pn1_main.SetMinSize(size)
+        # self.pn1_main.SetVirtualSize(size)
+        # self.scrolled_window.SetMinSize(size)
+        self.scrolled_window.SetVirtualSize(size)
+        wx.Event.Skip(event)
+
 
 app = wx.App(False)
 main_window = MainWindow(parent=None)
 main_window.Show(True)
+wx.lib.inspection.InspectionTool().Show()
 app.MainLoop()
 
 
