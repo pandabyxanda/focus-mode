@@ -55,35 +55,54 @@ class DataBase():
 
     def query_simple_load_on_date(self, date1, date2):
         self.cursor.execute("""
-                select REPLACE(f, '.exe', '') as ff, d from
+                select REPLACE(f, '.exe', '') as ff, d, sum(c_f) from
                 (
                 select
-                substr(full_name, 1, INSTR(full_name, "-")-1) ||
-                " " ||
-                trim(substr(substr(full_name, INSTR(full_name, "-")+1, length(full_name)), 1, INSTR(substr(full_name, INSTR(full_name, "-")+1, length(full_name)), "-")), "-") as f,
-                sum(julianday(time_end)-julianday(time_start))*24*60*60 as d
+                substr(full_name, 1, 13) as f,
+                sum(julianday(time_end)-julianday(time_start))*24*60*60 as d,
+                count(full_name) as c_f
+                
                 from data
-                where substr(full_name, 1, 13) = "Google Chrome" and time_end BETWEEN :date1 AND :date2 and (julianday(time_end)-julianday(time_start))*24*60*60 >= 5
+                where substr(full_name, 1, 13) = "Google Chrome" and substr(full_name, 1, 21) != "Google Chrome-YouTube" and time_end BETWEEN :date1 AND :date2 and (julianday(time_end)-julianday(time_start))*24*60*60 >= 0
+                group by f
+                
+                union
+                
+                select
+                substr(full_name, 15, 7) as f,
+                sum(julianday(time_end)-julianday(time_start))*24*60*60 as d,
+                count(full_name) as c_f
+                
+                from data
+                where substr(full_name, 1, 21) = "Google Chrome-YouTube" and time_end BETWEEN :date1 AND :date2 and (julianday(time_end)-julianday(time_start))*24*60*60 >= 0
                 group by f
 
                 union
 
-                select substr(full_name, 1, INSTR(full_name, "-")-1) as f, sum(julianday(time_end)-julianday(time_start))*24*60*60 as d
+                select substr(full_name, 1, INSTR(full_name, "-")-1) as f, 
+                sum(julianday(time_end)-julianday(time_start))*24*60*60 as d, 
+                count(full_name) as c_f
                 from data
-                where substr(full_name, 1, 13) != "Google Chrome" and full_name like "%-%" and time_end BETWEEN :date1 AND :date2 and (julianday(time_end)-julianday(time_start))*24*60*60 >= 5
+                where substr(full_name, 1, 13) != "Google Chrome" and full_name like "%-%" and time_end BETWEEN :date1 AND :date2 and (julianday(time_end)-julianday(time_start))*24*60*60 >= 0
                 group by substr(full_name, 1, INSTR(full_name, "-")-1)
 
                 UNION
 
-                select full_name as f, sum(julianday(time_end)-julianday(time_start))*24*60*60 as d
+                select full_name as f, 
+                sum(julianday(time_end)-julianday(time_start))*24*60*60 as d, 
+                count(full_name) as c_f
                 from data
-                where substr(full_name, 1, 13) != "Google Chrome" and full_name not like "%-%" and time_end BETWEEN :date1 AND :date2 and (julianday(time_end)-julianday(time_start))*24*60*60 >= 5
+                where substr(full_name, 1, 13) != "Google Chrome" and full_name not like "%-%" and time_end BETWEEN :date1 AND :date2 and (julianday(time_end)-julianday(time_start))*24*60*60 >= 0
                 group by full_name
                 )
-                
-                group by f
+
+                group by ff
                 order by d desc
                 """, {'date1': date1, 'date2': date2})
+
+
+
+
         return self.cursor.fetchall()
 
     def query_simple_load_on_date_test(self, date1, date2):
@@ -96,7 +115,7 @@ class DataBase():
                 trim(substr(substr(full_name, INSTR(full_name, "-")+1, length(full_name)), 1, INSTR(substr(full_name, INSTR(full_name, "-")+1, length(full_name)), "-")), "-") as f,
                 sum(julianday(time_end)-julianday(time_start))*24*60*60 as d
                 from data
-                where substr(full_name, 1, 13) = "Google Chrome" and time_end BETWEEN :date1 AND :date2 and (julianday(time_end)-julianday(time_start))*24*60*60 >= 5
+                where substr(full_name, 1, 13) = "Google Chrome" and time_end BETWEEN :date1 AND :date2 and (julianday(time_end)-julianday(time_start))*24*60*60 >= 0
                 group by f
                 )
                 where d >= 1
@@ -107,9 +126,9 @@ class DataBase():
 
     def query_extended_load_on_date(self, date1, date2):
         self.cursor.execute("""
-                            select REPLACE(full_name, '.exe', '') as f, sum(julianday(time_end)-julianday(time_start))*24*60*60 as d
+                            select REPLACE(full_name, '.exe', '') as f, sum(julianday(time_end)-julianday(time_start))*24*60*60 as d, count(full_name) as c_f
                             from data
-                            where time_end BETWEEN :date1 AND :date2 and (julianday(time_end)-julianday(time_start))*24*60*60 >= 5
+                            where time_end BETWEEN :date1 AND :date2 and (julianday(time_end)-julianday(time_start))*24*60*60 >= 0
                             group by full_name
                             order by d desc
                             """,
@@ -119,9 +138,10 @@ class DataBase():
 
     def query_get_all_raw(self, date1, date2):
         self.cursor.execute("""
-                            select full_name as f, sum(julianday(time_end)-julianday(time_start))*24*60*60 as d
+                            select full_name as f, count(full_name) as c_f, sum(julianday(time_end)-julianday(time_start))*24*60*60 as d, count(full_name) as c_f
                             from data
-                            where time_end BETWEEN :date1 AND :date2 and (julianday(time_end)-julianday(time_start))*24*60*60 >= 5
+                            where time_end BETWEEN :date1 AND :date2 and (julianday(time_end)-julianday(time_start))*24*60*60 >= 0
+                            group by full_name
                             order by d desc
                             """,
                             {'date1': date1, 'date2': date2}
@@ -146,14 +166,23 @@ if __name__ == "__main__":
     db.connect()
     db.create_table_if_not_exists()
     # res = db.query_load_on_date()
-    res = db.query_simple_load_on_date('2022-12-29 00:00:00', '2022-12-29 23:59:59')
+    # '2023-01-04 07:00:00', '2023-01-05 07:00:00'
+    # '2022-12-30 00:00:00', '2022-12-30 23:59:59'
+    date1 = '2023-01-10 07:00:00'
+    date2 = '2023-01-11 07:00:00'
+    res = db.query_simple_load_on_date(date1, date2)
     print(f"{time.strftime('%H:%M:%S', time.gmtime(sum([x[1] for x in res])))}")
-    res = db.query_extended_load_on_date('2022-12-29 00:00:00', '2022-12-29 23:59:59')
+    print(f"{res = }")
+    print(f"{len(res) = }")
+    res = db.query_extended_load_on_date(date1, date2)
     print(f"{time.strftime('%H:%M:%S', time.gmtime(sum([x[1] for x in res])))}")
-    res = db.query_get_all_raw('2022-12-29 00:00:00', '2022-12-29 23:59:59')
+    print(f"{res = }")
+    print(f"{len(res) = }")
+    res = db.query_get_all_raw(date1, date2)
     print(f"{time.strftime('%H:%M:%S', time.gmtime(sum([x[1] for x in res])))}")
-    # [print(x) for x in res]
-    # print(f"{len(res) = }")
+    # s = [print(x) for x in res]
+    print(f"{res = }")
+    print(f"{len(res) = }")
 
     db.disconnect()
 
