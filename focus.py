@@ -1,23 +1,33 @@
-import json
+"""
+This program uses wxpython lib to track active windows and sets timer for a break.
+1st window is main. Dark window/screen is activated by timer, or button.
+Different widgets are placed in sizers for better spacing or panels/scrolled panels.
+Program analysis active window every second.
+Binds (region timers and bindings) are used to bind widgets and events on those widgets with functions.
+"""
+import datetime
+import json  # save parameters
+import time
+
+import pyautogui
+import vlc
 import wx
 import wx.adv
+import wx.lib.mixins.inspection  # tool to inspect windows\widgets parameters
 import wx.lib.scrolledpanel as scrolled
-import wx.lib.mixins.inspection
-import datetime
-import time
-import pyautogui
+from playsound import playsound
 
+import sql  # all data saved in database
 from active_windows import get_active_window
-import sql
 
 TRAY_TOOLTIP = 'Focus mode'
 MAIN_ICON = 'Main.ico'
 TRAY_ICON = 'tray1.png'
 TRAY_ICON2 = 'tray2.png'
 DATABASE_NAME = "database.db"
+SHORTEST_TIME = 1  # to show data if time period is greater than this time
+DAY_START_TIME = "07:00:00"  # data for the day is showed between 07:00:00 of chosen day and 06:59:59 of the next day
 
-
-# TODO: using this tool
 
 def create_menu_item(menu, label, func):
     item = wx.MenuItem(menu, -1, label)
@@ -33,6 +43,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         super(TaskBarIcon, self).__init__()
         self.set_icon(TRAY_ICON)
         self.Bind(wx.adv.EVT_TASKBAR_LEFT_DOWN, self.on_left_down)
+        self.frame.task_bar_icon = self
 
     def CreatePopupMenu(self):
         menu = wx.Menu()
@@ -59,7 +70,7 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
             self.set_icon(TRAY_ICON2)
 
     def on_hello(self, event):
-        print('Hello, world!')
+        print('Clicked on site menu')
 
     def on_exit(self, event):
 
@@ -73,57 +84,52 @@ class DarkWindow(wx.Frame):
         screen_size = wx.GetDisplaySize()
         self.parent = parent
 
-        print(screen_size)
+        print(f"{screen_size = }")
         wx.Frame.__init__(self, parent, title=title, size=(400, 400), pos=(0, 0),
                           style=wx.DEFAULT_FRAME_STYLE & ~wx.CAPTION | wx.STAY_ON_TOP | wx.FRAME_NO_TASKBAR)
-        self.panel5 = wx.Panel(self, id=wx.ID_ANY, pos=wx.DefaultPosition, size=screen_size,
-                               style=wx.TAB_TRAVERSAL, name=wx.PanelNameStr)
-        self.panel5.SetBackgroundColour("#1f2525")
+        self.dark_window_panel_1 = wx.Panel(self, id=wx.ID_ANY, pos=wx.DefaultPosition, size=screen_size,
+                                            style=wx.TAB_TRAVERSAL, name=wx.PanelNameStr)
+        self.dark_window_panel_1.SetBackgroundColour("#1f2525")
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
         font.SetPointSize(14)
-        self.panel5.SetFont(font)
-        self.opacity = 50
+        self.dark_window_panel_1.SetFont(font)
+        self.opacity = 55
         self.SetTransparent(self.opacity)
         self.Centre()
         self.Show()
         self.Iconize(False)
         self.mouse_coord = (0, 0)
         self.mouse_last_coord = (0, 0)
-        self.timer2 = wx.Timer(self, id=104)
-        self.timer2.Start(1000)
+        self.timer_till_break_end = wx.Timer(self, id=wx.ID_ANY)
+        self.timer_till_break_end.Start(1000)
 
-        self.timer3 = wx.Timer(self, id=105)
-        self.timer3.Start(100)
+        self.timer_change_opacity = wx.Timer(self, id=wx.ID_ANY)
+        self.timer_change_opacity.Start(100)
 
-        self.Bind(wx.EVT_TIMER, self.count_down, id=104)
-        self.Bind(wx.EVT_TIMER, self.on_timer_change_opacity, id=105)
+        self.Bind(wx.EVT_TIMER, self.count_down, id=self.timer_till_break_end.GetId())
+        self.Bind(wx.EVT_TIMER, self.on_timer_change_opacity, id=self.timer_change_opacity.GetId())
 
         self.break_duration = duration
         t = time.strftime('%M:%S', time.gmtime(duration))
         self.button_label = t + " \n" + "Press to close"
-        self.button_stop = wx.Button(self.panel5, id=90, label=self.button_label, size=(300, 200), style=wx.BORDER_NONE)
+        self.button_stop = wx.Button(self.dark_window_panel_1, id=wx.ID_ANY, label=self.button_label, size=(300, 200),
+                                     style=wx.BORDER_NONE)
         self.button_stop.Centre()
-        self.panel5.Bind(wx.EVT_BUTTON, self.on_button_stop, id=90)
+        self.dark_window_panel_1.Bind(wx.EVT_BUTTON, self.on_button_stop, id=self.button_stop.GetId())
         self.Maximize()
 
     def on_timer_change_opacity(self, event):
-        if self.opacity <= 240:
+        if self.opacity < 255:
             self.opacity += 10
             self.SetTransparent(self.opacity)
         else:
-            self.timer3.Stop()
+            self.timer_change_opacity.Stop()
 
     def on_button_stop(self, event):
-        self.close_break_window(event)
+        self.end_of_relax_mode(event)
 
     def end_of_relax_mode(self, event):
         self.close_break_window(event)
-
-    def close_break_window(self, event):
-        self.parent.time_before_break = self.parent.spin_ctrl1.GetValue() * 60
-        self.Close()
-        self.timer2.Stop()
-        wx.Event.Skip(event)
 
     def count_down(self, event):
         if self.break_duration > 1:
@@ -135,9 +141,19 @@ class DarkWindow(wx.Frame):
         self.button_label = t + " \n" + "Press to close"
         self.button_stop.Label = self.button_label
 
+    def close_break_window(self, event):
+        self.parent.time_before_break = self.parent.spin_ctrl_work_time.GetValue() * 60
+        self.parent.sound_end.play()
+
+        self.Close()
+        self.timer_till_break_end.Stop()
+        wx.Event.Skip(event)
+
 
 class MainWindow(wx.Frame):
     def __init__(self, parent, title, db):
+        self.sound_begin = vlc.MediaPlayer("start.mp3")
+        self.sound_end = vlc.MediaPlayer("end.mp3")
         self.Button1Name = "but1"
         self.db = db
         self.LastActiveWindow = None
@@ -149,15 +165,16 @@ class MainWindow(wx.Frame):
         self.max_id = max_id if max_id else 1
 
         self.new_line_added_to_db = False
-        self.line_height = 30
-        self.max_rows_to_show_on_main = 200
+
+        self.LINE_HEIGHT = 30
+        self.MAX_ROWS_TO_SHOW = 200
 
         try:
             with open('parametrs.json', 'r') as outfile:
                 params = json.load(outfile)
             if len(params) != 4:
-                raise ValueError
-        except Exception:
+                raise IOError('Invalid parameters')
+        except IOError:
             params = {
                 "work time": 20,
                 "break time": 15,
@@ -170,22 +187,22 @@ class MainWindow(wx.Frame):
 
         self.SetIcon(wx.Icon(MAIN_ICON, wx.BITMAP_TYPE_ICO))
 
-
-        self.panel1 = wx.Panel(self)
+        self.tab1_panel1 = wx.Panel(self)
         self.font1 = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
         self.font1.SetPointSize(14)
         self.font2 = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
         self.font2.SetPointSize(14)
         self.font2.MakeBold()
-        self.panel1.SetFont(self.font1)
+        self.tab1_panel1.SetFont(self.font1)
 
-        tabs = wx.Notebook(self.panel1, id=wx.ID_ANY)
+        tabs = wx.Notebook(self.tab1_panel1, id=wx.ID_ANY)
 
-        # region create tab 1
         self.vbox_main9 = wx.BoxSizer(wx.VERTICAL)
         self.vbox_main9.Add(tabs, 1, wx.ALL | wx.EXPAND, 0)
 
-        self.panel1.SetSizer(self.vbox_main9)
+        self.tab1_panel1.SetSizer(self.vbox_main9)
+
+        # region create tab 1
 
         self.scrolled_window = scrolled.ScrolledPanel(tabs, wx.ID_ANY)
         self.scrolled_window.SetupScrolling(scroll_x=False, scroll_y=True)
@@ -202,24 +219,24 @@ class MainWindow(wx.Frame):
         # self.pn3_main.SetBackgroundColour("#4444fe")
         self.hbox_main3 = wx.BoxSizer(wx.HORIZONTAL)
         self.hbox_main3.Add(self.datePicker1, border=0)
-        self.checkBox1 = wx.CheckBox(self.pn3_main, wx.ID_ANY, u"Extended", wx.DefaultPosition, wx.DefaultSize,
-                                     style=wx.ALIGN_RIGHT)
-        self.hbox_main3.Add(self.checkBox1, flag=wx.EXPAND | wx.LEFT, border=50)
+        self.check_box_extended_mode = wx.CheckBox(
+            self.pn3_main, wx.ID_ANY, u"Extended", wx.DefaultPosition, wx.DefaultSize, style=wx.ALIGN_RIGHT
+        )
+        self.hbox_main3.Add(self.check_box_extended_mode, flag=wx.EXPAND | wx.LEFT, border=50)
         self.pn3_main.SetSizer(self.hbox_main3)
         self.vbox_main.Add(self.pn3_main, flag=wx.ALIGN_CENTER | wx.DOWN | wx.UP, border=5)
 
-        self.pn1_main = wx.Panel(self.scrolled_window,
-                                 size=(200, 0))
+        self.tab1_panel_1_1 = wx.Panel(self.scrolled_window, size=(200, 0))
 
-        self.pn2_main = wx.Panel(self.scrolled_window, size=(200, 0))
+        self.tab1_panel_1_2 = wx.Panel(self.scrolled_window, size=(200, 0))
 
         self.hbox_main = wx.BoxSizer(wx.HORIZONTAL)
         self.vbox_main.Add(self.hbox_main, flag=wx.EXPAND | wx.ALIGN_LEFT, border=0)
 
-        self.hbox_main.Add(self.pn1_main, flag=wx.EXPAND, border=0, proportion=1)
-        self.hbox_main.Add(self.pn2_main, flag=wx.EXPAND, border=0)
+        self.hbox_main.Add(self.tab1_panel_1_1, flag=wx.EXPAND, border=0, proportion=1)
+        self.hbox_main.Add(self.tab1_panel_1_2, flag=wx.EXPAND, border=0)
 
-        current_date = datetime.date.today()
+        # current_date = datetime.date.today()
         self.on_date_picker(None)
 
         self.all_rows = self.get_rows_from_database()
@@ -227,197 +244,172 @@ class MainWindow(wx.Frame):
         # endregion
 
         # region create tab 2
-        self.panel2 = wx.Panel(tabs)
+        self.tab2_panel_1 = wx.Panel(tabs)
 
-        self.panel2.SetFont(self.font1)
+        self.tab2_panel_1.SetFont(self.font1)
 
-        tabs.AddPage(self.panel2, "Relax", select=True)
+        tabs.AddPage(self.tab2_panel_1, "Relax", select=True)
 
         vbox = wx.BoxSizer(wx.VERTICAL)
-        self.panel2.SetSizer(vbox)
+        self.tab2_panel_1.SetSizer(vbox)
 
         hbox1 = wx.BoxSizer(wx.HORIZONTAL)
-        pn = wx.Panel(self.panel2)
-        sb1 = wx.StaticBox(pn, label="Timer:", size=(150, 50))
-        self.rd1 = wx.RadioButton(pn, label="On", pos=(10, 20), style=wx.RB_GROUP, id=92)
-        rd2 = wx.RadioButton(pn, label="Off", pos=(100, 20), id=93)
+        pn = wx.Panel(self.tab2_panel_1)
+        wx.StaticBox(pn, label="Timer:", size=(150, 50))
+        self.rd1 = wx.RadioButton(pn, label="On", pos=(10, 20), style=wx.RB_GROUP, id=wx.ID_ANY)
+        rd2 = wx.RadioButton(pn, label="Off", pos=(100, 20), id=wx.ID_ANY)
         rd2.SetValue(False)
 
         hbox1.Add(pn, flag=wx.LEFT | wx.TOP, border=10)
-        # hbox.Add(rd1, flag=wx.LEFT | wx.TOP, border=10)
-        # hbox.Add(rd2, flag=wx.RIGHT | wx.TOP, border=10)
         vbox.Add(hbox1, flag=wx.ALL | wx.ALIGN_CENTER, border=10)
-
-        # hbox2 = wx.BoxSizer(wx.HORIZONTAL)
-        # st1 = wx.StaticText(
-        #     self.panel2, id=wx.ID_ANY, label="Work time, seconds", pos=(10, 0),
-        #     size=wx.DefaultSize, style=0, name=wx.StaticTextNameStr
-        # )
-        # self.spin_ctrl1 = wx.SpinCtrl(self.panel2, id=71, value="30", pos=(200, 0),
-        #                               size=wx.DefaultSize, style=wx.SP_ARROW_KEYS, min=10, max=1000, initial=0,
-        #                               name="wxSpinCtrl")
-        # hbox2.Add(st1, flag=wx.LEFT | wx.TOP, border=10)
-        # hbox2.Add(self.spin_ctrl1, flag=wx.LEFT | wx.TOP, border=10)
-        # vbox.Add(hbox2, flag=wx.ALL | wx.ALIGN_CENTER, border=10)
 
         g_sizer1 = wx.FlexGridSizer(rows=5, cols=2, vgap=0, hgap=0)
         g_sizer1.SetFlexibleDirection(direction=wx.HORIZONTAL)
         st1 = wx.StaticText(
-            self.panel2, id=wx.ID_ANY, label="Work time, minutes", pos=(10, 0),
+            self.tab2_panel_1, id=wx.ID_ANY, label="Work time, minutes", pos=(10, 0),
             size=wx.DefaultSize, style=0, name=wx.StaticTextNameStr
         )
-        self.spin_ctrl1 = wx.SpinCtrl(self.panel2, id=71, value=str(params["work time"]), pos=(200, 0),
-                                      size=wx.DefaultSize, style=wx.SP_ARROW_KEYS, min=1, max=1000, initial=0,
-                                      name="wxSpinCtrl")
+        self.spin_ctrl_work_time = wx.SpinCtrl(
+            self.tab2_panel_1, id=wx.ID_ANY, value=str(params["work time"]), pos=(200, 0),
+            size=wx.DefaultSize, style=wx.SP_ARROW_KEYS, min=1, max=1000, initial=0,
+            name="wxSpinCtrl"
+        )
         st2 = wx.StaticText(
-            self.panel2, id=wx.ID_ANY, label="Break time, seconds", pos=(10, 50),
+            self.tab2_panel_1, id=wx.ID_ANY, label="Break time, seconds", pos=(10, 50),
             size=wx.DefaultSize, style=0, name=wx.StaticTextNameStr
         )
-        self.spin_ctrl2 = wx.SpinCtrl(self.panel2, id=wx.ID_ANY, value=str(params["break time"]), pos=(200, 50),
-                                      size=wx.DefaultSize, style=wx.SP_ARROW_KEYS, min=1, max=1000, initial=0,
-                                      name="wxSpinCtrl2")
+        self.spin_ctrl_break_time = wx.SpinCtrl(
+            self.tab2_panel_1, id=wx.ID_ANY, value=str(params["break time"]),
+            pos=(200, 50),
+            size=wx.DefaultSize, style=wx.SP_ARROW_KEYS, min=1, max=1000, initial=0,
+            name="wxSpinCtrl2"
+        )
         self.st3 = wx.StaticText(
-            self.panel2, id=wx.ID_ANY, label="Time till next break",
+            self.tab2_panel_1, id=wx.ID_ANY, label="Time till next break",
             size=wx.DefaultSize, style=0, name=wx.StaticTextNameStr
         )
 
-        self.time_before_break = self.spin_ctrl1.GetValue() * 60
+        self.time_before_break = self.spin_ctrl_work_time.GetValue() * 60
 
         t = time.strftime('%M:%S', time.gmtime(self.time_before_break))
         self.st4 = wx.StaticText(
-            self.panel2, id=wx.ID_ANY, label=t,
+            self.tab2_panel_1, id=wx.ID_ANY, label=t,
             size=wx.DefaultSize, style=0, name=wx.StaticTextNameStr
         )
 
         self.st5 = wx.StaticText(
-            self.panel2, id=wx.ID_ANY, label="Time inactive, seconds",
+            self.tab2_panel_1, id=wx.ID_ANY, label="Time inactive, seconds",
             size=wx.DefaultSize, style=0, name=wx.StaticTextNameStr
         )
 
-        self.spin_ctrl3 = wx.SpinCtrl(self.panel2, id=wx.ID_ANY, value=str(params["time inactive"]), pos=(200, 50),
-                                      size=wx.DefaultSize, style=wx.SP_ARROW_KEYS, min=1, max=1000, initial=0,
-                                      name="wxSpinCtrl2")
+        self.spin_ctrl_time_inactive = wx.SpinCtrl(
+            self.tab2_panel_1, id=wx.ID_ANY, value=str(params["time inactive"]), pos=(200, 50),
+            size=wx.DefaultSize, style=wx.SP_ARROW_KEYS, min=1, max=1000, initial=0, name="wxSpinCtrl2"
+        )
 
         self.st6 = wx.StaticText(
-            self.panel2, id=wx.ID_ANY, label="Time to renew, seconds",
+            self.tab2_panel_1, id=wx.ID_ANY, label="Time to renew, seconds",
             size=wx.DefaultSize, style=0, name=wx.StaticTextNameStr
         )
 
-        self.spin_ctrl4 = wx.SpinCtrl(self.panel2, id=wx.ID_ANY, value=str(params["time to renew"]), pos=(200, 50),
-                                      size=wx.DefaultSize, style=wx.SP_ARROW_KEYS, min=1, max=1000, initial=0,
-                                      name="wxSpinCtrl2")
-
-        # t = datetime.timedelta(seconds=10)
-        # t = str(t)
-        # # t = time.strftime('%M:%S', time.gmtime(t))
+        self.spin_ctrl_time_to_renew = wx.SpinCtrl(
+            self.tab2_panel_1, id=wx.ID_ANY, value=str(params["time to renew"]), pos=(200, 50),
+            size=wx.DefaultSize, style=wx.SP_ARROW_KEYS, min=1, max=1000, initial=0, name="wxSpinCtrl2"
+        )
 
         g_sizer1.Add(st1, flag=wx.LEFT | wx.TOP, border=10)
-        g_sizer1.Add(self.spin_ctrl1, flag=wx.LEFT | wx.TOP, border=10)
+        g_sizer1.Add(self.spin_ctrl_work_time, flag=wx.LEFT | wx.TOP, border=10)
 
         g_sizer1.Add(st2, flag=wx.LEFT | wx.TOP, border=10)
-        g_sizer1.Add(self.spin_ctrl2, flag=wx.LEFT | wx.TOP, border=10)
+        g_sizer1.Add(self.spin_ctrl_break_time, flag=wx.LEFT | wx.TOP, border=10)
 
         g_sizer1.Add(self.st5, flag=wx.LEFT | wx.TOP, border=10)
-        g_sizer1.Add(self.spin_ctrl3, flag=wx.LEFT | wx.TOP, border=10)
+        g_sizer1.Add(self.spin_ctrl_time_inactive, flag=wx.LEFT | wx.TOP, border=10)
 
         g_sizer1.Add(self.st6, flag=wx.LEFT | wx.TOP, border=10)
-        g_sizer1.Add(self.spin_ctrl4, flag=wx.LEFT | wx.TOP, border=10)
+        g_sizer1.Add(self.spin_ctrl_time_to_renew, flag=wx.LEFT | wx.TOP, border=10)
 
         g_sizer1.Add(self.st3, flag=wx.LEFT | wx.TOP, border=10)
         g_sizer1.Add(self.st4, flag=wx.LEFT | wx.TOP, border=10)
         vbox.Add(g_sizer1, flag=wx.ALL | wx.ALIGN_CENTER, border=10)
 
         hbox5 = wx.BoxSizer(wx.HORIZONTAL)
-        self.button_start = wx.Button(self.panel2, id=91, label="Start break", pos=(200, 200), size=(200, 100))
+        self.button_start = wx.Button(self.tab2_panel_1, id=wx.ID_ANY, label="Start break", pos=(200, 200),
+                                      size=(200, 100)
+                                      )
         hbox5.Add(self.button_start, flag=wx.LEFT | wx.TOP, border=10)
         vbox.Add(hbox5, flag=wx.ALL | wx.ALIGN_CENTER, border=10)
         # endregion
 
-        self.panel2.Bind(wx.EVT_BUTTON, self.break_begin, id=91)
-
-        self.timer1 = wx.Timer(self, id=50)
+        # region timers and bindings
+        self.timer1 = wx.Timer(self, id=wx.ID_ANY)
         self.timer1.Start(1000)
+        self.timer_activity = wx.Timer(self, id=wx.ID_ANY)
+        self.timer_activity.Start(self.spin_ctrl_time_inactive.GetValue() * 1000)
+        self.timer_till_break = wx.Timer(self, id=wx.ID_ANY)
+        self.timer_till_break.Start(1000)
+        self.timer_inactivity = wx.Timer(self, id=wx.ID_ANY)
 
-        self.timer2 = wx.Timer(self, id=60)
-        self.timer2.Start(self.spin_ctrl3.GetValue() * 1000)
+        self.Bind(wx.EVT_TIMER, self.on_timer_1, id=self.timer1.GetId())
+        self.Bind(wx.EVT_TIMER, self.check_inactivity_timer, id=self.timer_inactivity.GetId())
+        self.Bind(wx.EVT_TIMER, self.check_activity, id=self.timer_activity.GetId())
+        self.Bind(wx.EVT_TIMER, self.time_till_break, id=self.timer_till_break.GetId())
 
-        self.timer3 = wx.Timer(self, id=61)
-        self.timer3.Start(1000)
+        self.Bind(wx.EVT_SPINCTRL, self.on_spin_ctrl_work_time, id=self.spin_ctrl_work_time.GetId())
+        self.Bind(wx.EVT_SPINCTRL, self.on_spin_ctrl_break_time, id=self.spin_ctrl_break_time.GetId())
+        self.Bind(wx.EVT_SPINCTRL, self.on_spin_ctrl_time_till_break, id=self.spin_ctrl_time_to_renew.GetId())
+        self.Bind(wx.EVT_SPINCTRL, self.on_spin_ctrl_time_inactive, id=self.spin_ctrl_time_inactive.GetId())
 
-        self.timer4 = wx.Timer(self, id=62)
-        self.Bind(wx.EVT_TIMER, self.check_inactivity_timer, id=62)
-
-        self.Bind(wx.EVT_TIMER, self.check_activity, id=60)
-        self.Bind(wx.EVT_TIMER, self.time_till_break, id=61)
-        self.Bind(wx.EVT_SPINCTRL, self.on_spinctrl1, id=71)
-        self.Bind(wx.EVT_SPINCTRL, self.on_spinctrl3, id=self.spin_ctrl3.GetId())
-        self.Bind(wx.EVT_SPINCTRL, self.on_spinctrl2, id=self.spin_ctrl2.GetId())
-        self.Bind(wx.EVT_SPINCTRL, self.on_spinctrl4, id=self.spin_ctrl4.GetId())
-
-        self.panel1.Bind(wx.EVT_LEFT_DOWN, self.lmb_pressed)
-        # self.Bind(wx.EVT_BUTTON, self.onButton1, id=self.btn1.GetId())
-
-        self.Bind(wx.EVT_TIMER, self.func1, id=50)
-        # self.Bind(wx.EVT_TIMER, self.relax_darken, id=60)
         self.Bind(wx.EVT_MOVING, self.on_move)
         self.Bind(wx.EVT_SIZE, self.on_resize)
-        # self.Bind(wx.EVT_CLOSE, self.on_exit)
+        self.Bind(wx.EVT_CLOSE, self.on_minimize)
+        self.Bind(wx.EVT_CHECKBOX, self.on_check_box_extended_mode)
 
-        self.Bind(wx.EVT_CLOSE, self.on_minimize)
-        self.Bind(wx.EVT_CLOSE, self.on_minimize)
-        self.Bind(wx.EVT_CHECKBOX, self.on_check_box)
         self.datePicker1.Bind(wx.adv.EVT_DATE_CHANGED, self.on_date_picker)
 
-        self.pn1_main.Bind(wx.EVT_PAINT, self.on_paint1)
-        self.pn2_main.Bind(wx.EVT_PAINT, self.on_paint2)
+        self.tab1_panel1.Bind(wx.EVT_SET_FOCUS, self.on_focus)
+        self.tab1_panel1.Bind(wx.EVT_LEFT_DOWN, self.lmb_pressed)
 
-        self.panel1.Bind(wx.EVT_SET_FOCUS, self.on_focus)
+        self.tab1_panel_1_1.Bind(wx.EVT_PAINT, self.on_paint1)
+        self.tab1_panel_1_2.Bind(wx.EVT_PAINT, self.on_paint2)
+
+        self.tab2_panel_1.Bind(wx.EVT_BUTTON, self.break_begin, id=self.button_start.GetId())
+        # endregion
 
     def on_date_picker(self, event):
         a = self.datePicker1.GetValue()
         print(f"{a = }")
         b = wx.DateTime.FormatISOCombined(a).split("T")[0]
-        # b = f"{time.strftime('%H:%M:%S', time.gmtime(b))}"
-        # print(f"{b = }")
-        # d1 = "2022-12-29"
-        t1 = "07:00:00"
-        d1 = datetime.datetime.fromisoformat(f"{b} {t1}")
-        print(f"{d1 = }")
-        one_day = datetime.timedelta(days=1)
+        d1 = datetime.datetime.fromisoformat(f"{b} {DAY_START_TIME}")
+        one_day = datetime.timedelta(hours=23, minutes=59, seconds=59)
         self.date_start = d1
         self.date_end = d1 + one_day
-        print(f"{self.date_start = }")
-        print(f"{self.date_end = }")
-        self.check_box_pressed = True
-        self.Refresh()
-        print("self.refreshed")
-
-    def on_check_box(self, event):
-        # self.v = self.checkBox1.GetValue()
         self.check_box_pressed = True
         self.Refresh()
 
-    def on_spinctrl1(self, event):
-        self.time_before_break = self.spin_ctrl1.GetValue() * 60
+    def on_check_box_extended_mode(self, event):
+        self.check_box_pressed = True
+        self.Refresh()
+
+    def on_spin_ctrl_work_time(self, event):
+        self.time_before_break = self.spin_ctrl_work_time.GetValue() * 60
         t = time.strftime('%M:%S', time.gmtime(self.time_before_break))
-        # print(f"{t = }")
         self.st4.Label = str(t)
         self.save_params_to_json()
 
-    def on_spinctrl3(self, event):
-        print("on_spinctrl3")
-        self.timer2.Stop()
-        self.timer2.Start(self.spin_ctrl3.GetValue() * 1000)
+    def on_spin_ctrl_break_time(self, event):
         self.save_params_to_json()
 
-    def on_spinctrl2(self, event):
+    def on_spin_ctrl_time_inactive(self, event):
+        self.timer_inactivity.Stop()
+        self.timer_inactivity.Start(self.spin_ctrl_time_inactive.GetValue() * 1000)
         self.save_params_to_json()
 
-    def on_spinctrl4(self, event):
+    def on_spin_ctrl_time_till_break(self, event):
         self.save_params_to_json()
 
     def time_till_break(self, event):
-        if self.rd1.GetValue() == True:
+        if self.rd1.GetValue():
             if self.user_active:
                 if self.time_before_break > 1:
                     self.time_before_break -= 1
@@ -428,31 +420,21 @@ class MainWindow(wx.Frame):
                     self.time_before_break = -1
                     self.break_begin(event)
 
-    #     if self.time_of_inactivity < 10:
-    #         self.time_of_inactivity += 1
-    #     else:
-    #         self.time_of_inactivity = 0
-    #
-    #     if self.time_of_inactivity == 10:
-    #         self.check_activity()
-    #
     def check_activity(self, event):
-
-        # self.mouse_coord = pyautogui.position()
         mouse_new_coord = pyautogui.position()
         if mouse_new_coord != self.mouse_last_coord:
             self.mouse_last_coord = mouse_new_coord
             self.user_active = True
-            self.timer4.Stop()
+            self.timer_inactivity.Stop()
         else:
             self.user_active = False
-            if self.timer4.IsRunning() == False:
-                self.timer4.Start(self.spin_ctrl4.GetValue() * 1000)
+            if not self.timer_inactivity.IsRunning():
+                self.timer_inactivity.Start(self.spin_ctrl_time_to_renew.GetValue() * 1000)
 
         print(f"{self.user_active = }")
 
     def check_inactivity_timer(self, event):
-        self.time_before_break = self.spin_ctrl1.GetValue() * 60
+        self.time_before_break = self.spin_ctrl_work_time.GetValue() * 60
         print(f"inactive for some time")
         self.Refresh()
 
@@ -472,90 +454,24 @@ class MainWindow(wx.Frame):
         self.Refresh()
         wx.Event.Skip(event)
 
-    # def on_exit(self, event):
-    #     print("closing window")
-    #     wx.CallAfter(self.Destroy)
-    #     self.Close()
-
     def on_minimize(self, event):
         print("minimizing window")
         self.Iconize()
         self.Hide()
+        self.task_bar_icon.set_icon(TRAY_ICON2)
         # wx.CallAfter(self.Destroy)
         # self.Close()
 
-    def on_paint1(self, event):
-        print("onPaint1")
-        width_of_panel_with_names = self.pn1_main.GetVirtualSize()[0]
-        # self.task_bar_icon.set_icon(TRAY_ICON2)
-        if self.new_line_added_to_db == True or self.check_box_pressed == True:
-            self.all_rows = self.get_rows_from_database()
-            self.new_line_added_to_db = False
-            self.check_box_pressed = False
-
-        dc = wx.PaintDC(self.pn1_main)
-        # dc2 = wx.PaintDC(self.pn2_main)
-        dc.SetPen(wx.Pen('#fdc073', style=wx.TRANSPARENT))
-
-        dc.DrawLine(0, 0, 500, 700)
-        dc.SetBrush(wx.Brush('#d5dde6', wx.SOLID))
-
-        for i, row in enumerate(self.all_rows):
-            if len(row) > 2:
-                data = f"({row[2]}) {row[0]} "
-            else:
-                data = f"{row[0]}"
-
-            duration = row[1]
-            # print(f"{duration = }")
-            if i >= self.max_rows_to_show_on_main:
-                # print(f"{self.max_rows_to_show_on_main = }")
-                break
-            if dc.GetTextExtent(data)[0] > width_of_panel_with_names - 35:
-                while dc.GetTextExtent(data)[0] > width_of_panel_with_names - 35:
-                    data = data[:len(data) - 1]
-                data = data[:len(data)] + '...'
-            # if duration > 0:
-            # dc.DrawRectangle(0, self.LineHeight * i, int(math.log(duration, 50)), self.LineHeight)
-            if i != len(self.all_rows) - 1:
-                # print(int(duration // self.all_rows[-1][1] * width_of_panel_with_names))
-                dc.DrawRectangle(0, self.line_height * i,
-                                 int(duration / self.all_rows[-1][1] * width_of_panel_with_names), self.line_height)
-                f = dc.DrawText(f"{data}", 20, self.line_height * i)
-            else:
-                dc.SetFont(self.font2)
-                f = dc.DrawText(f"{data}", 20, self.line_height * i)
-                dc.SetFont(self.font1)
-
-    def on_paint2(self, event):
-        print("onPaint2")
-        # print(event)
-        # self.task_bar_icon.set_icon(TRAY_ICON2)
-
-        dc2 = wx.PaintDC(self.pn2_main)
-        # dc2 = wx.PaintDC(self.pn2_main)
-        dc2.SetPen(wx.Pen('#fdc073', style=wx.TRANSPARENT))
-
-        dc2.DrawLine(0, 0, 500, 700)
-        dc2.SetBrush(wx.Brush('#d5dde6', wx.SOLID))
-        for i, row in enumerate(self.all_rows):
-            duration = row[1]
-            if i >= self.max_rows_to_show_on_main:
-                break
-            if i == len(self.all_rows) - 1:
-                dc2.SetFont(self.font2)
-                dc2.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 10, self.line_height * i)
-                dc2.SetFont(self.font1)
-            else:
-                dc2.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 10, self.line_height * i)
-
-    def on_quit(self, event):
-        print(event)
-        print("ccccccccccccc")
-        self.Close()
+    # def on_quit(self, event):
+    #     print(event)
+    #     self.Close()
 
     def break_begin(self, event):
-        frame = DarkWindow(self, "Focus mode33", self.spin_ctrl2.GetValue())
+        DarkWindow(self, "Focus mode Break time", self.spin_ctrl_break_time.GetValue())
+
+        self.sound_begin.stop()
+        self.sound_begin.play()
+
         wx.Event.Skip(event)
 
     def lmb_pressed(self, event):
@@ -565,49 +481,88 @@ class MainWindow(wx.Frame):
 
     def on_button1(self, event):
         print("pressed button...")
-        # self.btn1.SetLabel("1245")
-        # self.btn1
-
-    # def relax_darken(self, event):
-    #     print("darken")
-    #     # print(event.GetId(), "func2")
-    #     # self.getrowsfromdatabase()
-    #     pass
 
     def get_rows_from_database(self):
-        if self.checkBox1.GetValue():
-            res = self.db.query_extended_load_on_date(self.date_start, self.date_end)
+        if self.check_box_extended_mode.GetValue():
+            res = self.db.query_extended_load_on_date(self.date_start, self.date_end, SHORTEST_TIME)
         else:
-            res = self.db.query_simple_load_on_date(self.date_start, self.date_end)
+            res = self.db.query_simple_load_on_date(self.date_start, self.date_end, SHORTEST_TIME)
 
         self.all_rows = res
-        # print(f"{len(self.all_rows) = }")
         if len(self.all_rows) > 0:
             if len(self.all_rows[0]) > 2:
                 result_row = (f"({sum([x[2] for x in self.all_rows])})", sum([x[1] for x in self.all_rows]))
             else:
                 result_row = (f"Result", sum([x[1] for x in self.all_rows]))
-
-
         else:
-            result_row = (f"No result for that day", 0)
+            result_row = (f"No result for current day", 0)
         self.all_rows.append(result_row)
-        # print(f"{self.all_rows = }")
 
         print("Loaded from db")
 
-        size1 = (100, (min(self.max_rows_to_show_on_main, len(self.all_rows))) * self.line_height)
-        size2 = (100,
-                 (min(self.max_rows_to_show_on_main, len(self.all_rows))) * self.line_height + self.pn3_main.GetSize()[
-                     1] + 10)
-        self.pn1_main.SetMinSize(size1)
+        size1 = (100, (min(self.MAX_ROWS_TO_SHOW, len(self.all_rows))) * self.LINE_HEIGHT)
+        size2 = (
+            100,
+            (min(self.MAX_ROWS_TO_SHOW, len(self.all_rows))) *
+            self.LINE_HEIGHT + self.pn3_main.GetSize()[1] + 10
+        )
+        self.tab1_panel_1_1.SetMinSize(size1)
         self.scrolled_window.SetVirtualSize(size2)
         return res
 
-    def func1(self, event):
-        # print(event.GetId())
-        # appName, windowName = getActiveWindow()
+    def on_paint1(self, event):
+        print("onPaint1")
+        width_of_panel_with_names = self.tab1_panel_1_1.GetVirtualSize()[0]
+        if self.new_line_added_to_db or self.check_box_pressed:
+            self.all_rows = self.get_rows_from_database()
+            self.new_line_added_to_db = False
+            self.check_box_pressed = False
 
+        dc = wx.PaintDC(self.tab1_panel_1_1)
+        dc.SetPen(wx.Pen('#fdc073', style=wx.TRANSPARENT))
+        dc.SetBrush(wx.Brush('#d5dde6', wx.SOLID))
+
+        for i, row in enumerate(self.all_rows):
+            if len(row) > 2:
+                data = f"({row[2]}) {row[0]} "
+            else:
+                data = f"{row[0]}"
+
+            duration = row[1]
+
+            if i >= self.MAX_ROWS_TO_SHOW:
+                break
+
+            if dc.GetTextExtent(data)[0] > width_of_panel_with_names - 35:
+                while dc.GetTextExtent(data)[0] > width_of_panel_with_names - 35:
+                    data = data[:len(data) - 1]
+                data = data[:len(data)] + '...'
+
+            if i != len(self.all_rows) - 1:
+                dc.DrawRectangle(0, self.LINE_HEIGHT * i,
+                                 int(duration / self.all_rows[-1][1] * width_of_panel_with_names), self.LINE_HEIGHT
+                                 )
+                dc.DrawText(data, 20, self.LINE_HEIGHT * i)
+            else:
+                dc.SetFont(self.font2)
+                dc.DrawText(data, 20, self.LINE_HEIGHT * i)
+                dc.SetFont(self.font1)
+
+    def on_paint2(self, event):
+        print("onPaint2")
+        dc2 = wx.PaintDC(self.tab1_panel_1_2)
+        for i, row in enumerate(self.all_rows):
+            duration = row[1]
+            if i >= self.MAX_ROWS_TO_SHOW:
+                break
+            if i == len(self.all_rows) - 1:
+                dc2.SetFont(self.font2)
+                dc2.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 10, self.LINE_HEIGHT * i)
+                dc2.SetFont(self.font1)
+            else:
+                dc2.DrawText(f"{time.strftime('%H:%M:%S', time.gmtime(duration))}", 10, self.LINE_HEIGHT * i)
+
+    def on_timer_1(self, event):
         self.save_to_db()
 
     def save_to_db(self):
@@ -616,30 +571,27 @@ class MainWindow(wx.Frame):
             full_app_name = '-'.join(active_window)
             if full_app_name != self.LastActiveWindow:
                 print("act wind changed")
-                if datetime.datetime.now() - self.TimeAppOpened > datetime.timedelta(seconds=0):
-                    if self.LastActiveWindow:
-                        self.max_id += 1
-                        self.db.query_save(self.max_id, self.LastActiveWindow, self.TimeAppOpened,
-                                           datetime.datetime.now())
-                        self.new_line_added_to_db = True
-                        print("Saved to db")
+                # if datetime.datetime.now() - self.TimeAppOpened > datetime.timedelta(seconds=0):
+                if self.LastActiveWindow:
+                    self.max_id += 1
+                    self.db.query_save(self.max_id, self.LastActiveWindow, self.TimeAppOpened,
+                                       datetime.datetime.now())
+                    self.new_line_added_to_db = True
+                    print("Saved to db")
 
                 self.LastActiveWindow = full_app_name
                 self.TimeAppOpened = datetime.datetime.now()
         else:
             print(active_window)
 
-        # self.Refresh()
-
     def save_params_to_json(self):
         x = {
-            "work time": self.spin_ctrl1.GetValue(),
-            "break time": self.spin_ctrl2.GetValue(),
-            "time inactive": self.spin_ctrl3.GetValue(),
-            "time to renew": self.spin_ctrl4.GetValue()
+            "work time": self.spin_ctrl_work_time.GetValue(),
+            "break time": self.spin_ctrl_break_time.GetValue(),
+            "time inactive": self.spin_ctrl_time_inactive.GetValue(),
+            "time to renew": self.spin_ctrl_time_to_renew.GetValue()
         }
-        # convert into JSON:
-        y = json.dumps(x)
+
         with open('parametrs.json', 'w') as outfile:
             json.dump(x, outfile, indent=4)
 
@@ -653,7 +605,7 @@ class App(wx.App):
         frame = MainWindow(None, "Focus mode", self.db)
         frame.Centre()
         frame.Show(True)
-        # wx.lib.inspection.InspectionTool().Show()
+        # wx.lib.inspection.InspectionTool().Show()  # to inspect all parameters of windows\panels\widgets
         self.SetTopWindow(frame)
         TaskBarIcon(frame)
         return True
