@@ -135,6 +135,7 @@ class DarkWindow(wx.Frame):
         self.end_of_relax_mode(event)
 
     def end_of_relax_mode(self, event):
+
         self.close_break_window(event)
 
     def count_down(self, event):
@@ -149,6 +150,7 @@ class DarkWindow(wx.Frame):
 
     def close_break_window(self, event):
         self.parent.time_before_break = self.parent.spin_ctrl_work_time.GetValue() * 60 + 1
+        self.parent.timer_till_break.Start(1000)
         self.parent.sound_end.stop()
         self.parent.sound_end.play()
 
@@ -479,11 +481,11 @@ class MainWindow(wx.Frame):
     #     self.Close()
 
     def break_begin(self, event):
-        DarkWindow(self, "Focus mode Break time", self.spin_ctrl_break_time.GetValue() + 1)
+        DarkWindow(self, "Focus mode Break time", self.spin_ctrl_break_time.GetValue())
 
         self.sound_begin.stop()
         self.sound_begin.play()
-
+        self.timer_till_break.Stop()
         wx.Event.Skip(event)
 
     def lmb_pressed(self, event):

@@ -44,7 +44,7 @@ class DataBase:
 
         self.cursor.execute(
             """
-            select REPLACE(f, '.exe', '') as ff, sum(d), sum(c_f) from (
+            select REPLACE(f, '.exe', '') as ff, sum(d) as s_d, sum(c_f) from (
                 select
                 substr(full_name, 1, 13) as f,
                 sum(julianday(time_end)-julianday(time_start))*24*60*60 as d,
@@ -96,7 +96,7 @@ class DataBase:
                 )
 
             group by ff
-            order by d desc
+            order by s_d desc
             """,
             {'date1': date1, 'date2': date2, 'shortest_time': shortest_time}
         )
