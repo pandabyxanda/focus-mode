@@ -44,7 +44,7 @@ class DataBase:
 
         self.cursor.execute(
             """
-            select REPLACE(f, '.exe', '') as ff, d, sum(c_f) from (
+            select REPLACE(f, '.exe', '') as ff, sum(d), sum(c_f) from (
                 select
                 substr(full_name, 1, 13) as f,
                 sum(julianday(time_end)-julianday(time_start))*24*60*60 as d,
@@ -158,17 +158,19 @@ if __name__ == "__main__":
     db = DataBase("database.db")
     db.connect()
     db.create_table_if_not_exists()
-    date_1 = '2023-01-10 07:00:00'
-    date_2 = '2023-01-11 07:00:00'
-    short_time = 1
+    date_1 = '2023-01-12 07:00:00'
+    date_2 = '2023-01-13 06:59:59'
+    short_time = 31
     res = db.query_simple_load_on_date(date_1, date_2, short_time)
     print(f"{time.strftime('%H:%M:%S', time.gmtime(sum([x[1] for x in res])))}")
     print(f"{res = }")
     print(f"{len(res) = }")
+    print()
     res = db.query_extended_load_on_date(date_1, date_2, short_time)
     print(f"{time.strftime('%H:%M:%S', time.gmtime(sum([x[1] for x in res])))}")
     print(f"{res = }")
     print(f"{len(res) = }")
+    print()
     res = db.query_get_all_raw(date_1, date_2, short_time)
     print(f"{time.strftime('%H:%M:%S', time.gmtime(sum([x[1] for x in res])))}")
     # s = [print(x) for x in res]

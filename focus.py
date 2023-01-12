@@ -15,15 +15,15 @@ import wx
 import wx.adv
 import wx.lib.mixins.inspection  # tool to inspect windows\widgets parameters
 import wx.lib.scrolledpanel as scrolled
-from playsound import playsound
+
 
 import sql  # all data saved in database
 from active_windows import get_active_window
 
-TRAY_TOOLTIP = 'Focus mode'
-MAIN_ICON = 'Main.ico'
-TRAY_ICON = 'tray1.png'
-TRAY_ICON2 = 'tray2.png'
+TRAY_TOOLTIP = 'Focus mode lol'
+MAIN_ICON = 'Images/Main.ico'
+TRAY_ICON = 'Images/tray1.png'
+TRAY_ICON2 = 'Images/tray2.png'
 DATABASE_NAME = "database.db"
 SHORTEST_TIME = 1  # to show data if time period is greater than this time
 DAY_START_TIME = "07:00:00"  # data for the day is showed between 07:00:00 of chosen day and 06:59:59 of the next day
@@ -52,13 +52,14 @@ class TaskBarIcon(wx.adv.TaskBarIcon):
         create_menu_item(menu, 'Exit', self.on_exit)
         return menu
 
-    def set_icon(self, path):
+    def set_icon(self, path, text=""):
         icon = wx.Icon(path)
-        self.SetIcon(icon, TRAY_TOOLTIP)
+        self.SetIcon(icon, text)
 
     def on_left_down(self, event):
         print('Tray icon was left-clicked.')
         print(f"{self.frame.IsIconized() = }")
+
         if self.frame.IsIconized():
             self.set_icon(TRAY_ICON)
             self.frame.Show()
@@ -118,6 +119,11 @@ class DarkWindow(wx.Frame):
         self.dark_window_panel_1.Bind(wx.EVT_BUTTON, self.on_button_stop, id=self.button_stop.GetId())
         self.Maximize()
 
+        # notification = wx.adv.NotificationMessage("Title", "This is the message.")
+        #
+        # # show the notification
+        # notification.Show()
+
     def on_timer_change_opacity(self, event):
         if self.opacity < 255:
             self.opacity += 10
@@ -142,7 +148,8 @@ class DarkWindow(wx.Frame):
         self.button_stop.Label = self.button_label
 
     def close_break_window(self, event):
-        self.parent.time_before_break = self.parent.spin_ctrl_work_time.GetValue() * 60
+        self.parent.time_before_break = self.parent.spin_ctrl_work_time.GetValue() * 60 + 1
+        self.parent.sound_end.stop()
         self.parent.sound_end.play()
 
         self.Close()
@@ -152,8 +159,8 @@ class DarkWindow(wx.Frame):
 
 class MainWindow(wx.Frame):
     def __init__(self, parent, title, db):
-        self.sound_begin = vlc.MediaPlayer("start.mp3")
-        self.sound_end = vlc.MediaPlayer("end.mp3")
+        self.sound_begin = vlc.MediaPlayer("/Sounds/start.mp3")
+        self.sound_end = vlc.MediaPlayer("/Sounds/end.mp3")
         self.Button1Name = "but1"
         self.db = db
         self.LastActiveWindow = None
@@ -345,7 +352,6 @@ class MainWindow(wx.Frame):
         self.timer1 = wx.Timer(self, id=wx.ID_ANY)
         self.timer1.Start(1000)
         self.timer_activity = wx.Timer(self, id=wx.ID_ANY)
-        self.timer_activity.Start(self.spin_ctrl_time_inactive.GetValue() * 1000)
         self.timer_till_break = wx.Timer(self, id=wx.ID_ANY)
         self.timer_till_break.Start(1000)
         self.timer_inactivity = wx.Timer(self, id=wx.ID_ANY)
@@ -416,25 +422,30 @@ class MainWindow(wx.Frame):
                     t = time.strftime('%M:%S', time.gmtime(self.time_before_break))
                     # print(f"{t = }")
                     self.st4.Label = str(t)
+                    if self.IsIconized():
+                        self.task_bar_icon.set_icon(TRAY_ICON2, t)
+                    else:
+                        self.task_bar_icon.set_icon(TRAY_ICON, t)
                 elif self.time_before_break == 1:
                     self.time_before_break = -1
                     self.break_begin(event)
 
     def check_activity(self, event):
-        mouse_new_coord = pyautogui.position()
-        if mouse_new_coord != self.mouse_last_coord:
-            self.mouse_last_coord = mouse_new_coord
-            self.user_active = True
-            self.timer_inactivity.Stop()
-        else:
-            self.user_active = False
-            if not self.timer_inactivity.IsRunning():
+        self.user_active = False
+        if not self.timer_inactivity.IsRunning():
+            if self.spin_ctrl_time_to_renew.GetValue() > self.spin_ctrl_time_inactive.GetValue():
+                self.timer_inactivity.Start((self.spin_ctrl_time_to_renew.GetValue() -
+                                             self.spin_ctrl_time_inactive.GetValue()) * 1000)
+            else:
                 self.timer_inactivity.Start(self.spin_ctrl_time_to_renew.GetValue() * 1000)
+        self.timer_activity.Stop()
 
         print(f"{self.user_active = }")
 
     def check_inactivity_timer(self, event):
-        self.time_before_break = self.spin_ctrl_work_time.GetValue() * 60
+        self.time_before_break = self.spin_ctrl_work_time.GetValue() * 60 + 1
+        self.timer_inactivity.Stop()
+
         print(f"inactive for some time")
         self.Refresh()
 
@@ -450,9 +461,10 @@ class MainWindow(wx.Frame):
         wx.Event.Skip(event)
 
     def on_move(self, event):
-        print("OnMove")
-        self.Refresh()
-        wx.Event.Skip(event)
+        # print("OnMove")
+        # self.Refresh()
+        # wx.Event.Skip(event)
+        pass
 
     def on_minimize(self, event):
         print("minimizing window")
@@ -467,7 +479,7 @@ class MainWindow(wx.Frame):
     #     self.Close()
 
     def break_begin(self, event):
-        DarkWindow(self, "Focus mode Break time", self.spin_ctrl_break_time.GetValue())
+        DarkWindow(self, "Focus mode Break time", self.spin_ctrl_break_time.GetValue() + 1)
 
         self.sound_begin.stop()
         self.sound_begin.play()
@@ -564,6 +576,18 @@ class MainWindow(wx.Frame):
 
     def on_timer_1(self, event):
         self.save_to_db()
+
+        mouse_new_coord = pyautogui.position()
+        if mouse_new_coord != self.mouse_last_coord:
+            self.mouse_last_coord = mouse_new_coord
+            self.user_active = True
+            if self.timer_activity.IsRunning():
+                self.timer_activity.Stop()
+            if self.timer_inactivity.IsRunning():
+                self.timer_inactivity.Stop()
+        else:
+            if self.user_active and not self.timer_activity.IsRunning():
+                self.timer_activity.Start(self.spin_ctrl_time_inactive.GetValue() * 1000)
 
     def save_to_db(self):
         active_window = get_active_window()
