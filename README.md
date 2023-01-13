@@ -7,4 +7,4 @@ Program analyzes active window every second.
 There are two ways to use this application:
 1. Using Python 3.10.4. Main file - focus.py
 
-2. Simply downdload focus.exe and 2 folders: Images and Sounds to any folder on your computer.
+2. Simply download focus.exe and 2 folders: Images and Sounds to any folder on your computer.
