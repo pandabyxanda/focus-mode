@@ -10,7 +10,7 @@ import json  # save parameters
 import time
 
 import pyautogui
-import vlc
+import playsound
 import wx
 import wx.adv
 import wx.lib.mixins.inspection  # tool to inspect windows\widgets parameters
@@ -27,6 +27,9 @@ TRAY_ICON2 = 'Images/tray2.png'
 DATABASE_NAME = "database.db"
 SHORTEST_TIME = 1  # to show data if time period is greater than this time
 DAY_START_TIME = "07:00:00"  # data for the day is showed between 07:00:00 of chosen day and 06:59:59 of the next day
+
+MP3_START = "./Sounds/start.mp3"
+MP3_END = "./Sounds/end.mp3"
 
 
 def create_menu_item(menu, label, func):
@@ -151,8 +154,9 @@ class DarkWindow(wx.Frame):
     def close_break_window(self, event):
         self.parent.time_before_break = self.parent.spin_ctrl_work_time.GetValue() * 60 + 1
         self.parent.timer_till_break.Start(1000)
-        self.parent.sound_end.stop()
-        self.parent.sound_end.play()
+        # self.parent.sound_end.stop()
+        # self.parent.sound_end.play()
+        playsound.playsound(MP3_END, False)
 
         self.Close()
         self.timer_till_break_end.Stop()
@@ -161,8 +165,6 @@ class DarkWindow(wx.Frame):
 
 class MainWindow(wx.Frame):
     def __init__(self, parent, title, db):
-        self.sound_begin = vlc.MediaPlayer("/Sounds/start.mp3")
-        self.sound_end = vlc.MediaPlayer("/Sounds/end.mp3")
         self.Button1Name = "but1"
         self.db = db
         self.LastActiveWindow = None
@@ -185,10 +187,10 @@ class MainWindow(wx.Frame):
                 raise IOError('Invalid parameters')
         except IOError:
             params = {
-                "work time": 20,
-                "break time": 15,
-                "time inactive": 5,
-                "time to renew": 15
+                "work time": 30,
+                "break time": 60,
+                "time inactive": 120,
+                "time to renew": 30
             }
 
         wx.Frame.__init__(self, parent, title=title, size=(800, 700),
@@ -483,8 +485,9 @@ class MainWindow(wx.Frame):
     def break_begin(self, event):
         DarkWindow(self, "Focus mode Break time", self.spin_ctrl_break_time.GetValue())
 
-        self.sound_begin.stop()
-        self.sound_begin.play()
+        # self.sound_begin.stop()
+        # self.sound_begin.play()
+        playsound.playsound(MP3_START, False)
         self.timer_till_break.Stop()
         wx.Event.Skip(event)
 

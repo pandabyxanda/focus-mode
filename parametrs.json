@@ -1,6 +1,6 @@
 {
     "work time": 30,
-    "break time": 30,
+    "break time": 60,
     "time inactive": 120,
     "time to renew": 300
 }
