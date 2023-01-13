@@ -131,3 +131,5 @@ dmypy.json
 
 data_file.json
 database.db
+dist/
+*.spec
